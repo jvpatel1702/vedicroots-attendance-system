@@ -5,10 +5,26 @@ import { createClient } from '@/lib/supabaseClient';
 import { X, Save } from 'lucide-react';
 
 interface Props {
-    student?: any; // If passed, editing mode
+    student?: {
+        id: string;
+        first_name: string;
+        last_name: string;
+        classroom_id: string;
+        grade_id: string;
+    } | null; // If passed, editing mode
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+}
+
+interface Classroom {
+    id: string;
+    name: string;
+}
+
+interface Grade {
+    id: string;
+    name: string;
 }
 
 export default function StudentForm({ student, isOpen, onClose, onSuccess }: Props) {
@@ -18,10 +34,17 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
     const [lastName, setLastName] = useState('');
     const [classroomId, setClassroomId] = useState('');
     const [gradeId, setGradeId] = useState('');
-    const [classrooms, setClassrooms] = useState<any[]>([]);
-    const [grades, setGrades] = useState<any[]>([]);
+    const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+    const [grades, setGrades] = useState<Grade[]>([]);
 
     useEffect(() => {
+        const fetchMetaData = async () => {
+            const { data: cls } = await supabase.from('classrooms').select('*').order('name');
+            const { data: grds } = await supabase.from('grades').select('*').order('order');
+            if (cls) setClassrooms(cls);
+            if (grds) setGrades(grds);
+        };
+
         if (isOpen) {
             fetchMetaData();
             if (student) {
@@ -36,14 +59,7 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
                 setGradeId('');
             }
         }
-    }, [isOpen, student]);
-
-    const fetchMetaData = async () => {
-        const { data: cls } = await supabase.from('classrooms').select('*').order('name');
-        const { data: grds } = await supabase.from('grades').select('*').order('order');
-        if (cls) setClassrooms(cls);
-        if (grds) setGrades(grds);
-    };
+    }, [isOpen, student, supabase]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

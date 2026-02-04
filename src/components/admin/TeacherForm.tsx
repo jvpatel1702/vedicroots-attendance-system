@@ -5,10 +5,19 @@ import { createClient } from '@/lib/supabaseClient';
 import { X, Save } from 'lucide-react';
 
 interface Props {
-    teacher?: any; // If passed, editing mode
+    teacher?: {
+        id: string;
+        name: string;
+        email: string;
+    } | null; // If passed, editing mode
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+}
+
+interface Classroom {
+    id: string;
+    name: string;
 }
 
 export default function TeacherForm({ teacher, isOpen, onClose, onSuccess }: Props) {
@@ -17,9 +26,14 @@ export default function TeacherForm({ teacher, isOpen, onClose, onSuccess }: Pro
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [classroomId, setClassroomId] = useState(''); // Primary assignment
-    const [classrooms, setClassrooms] = useState<any[]>([]);
+    const [classrooms, setClassrooms] = useState<Classroom[]>([]);
 
     useEffect(() => {
+        const fetchClassrooms = async () => {
+            const { data } = await supabase.from('classrooms').select('*').order('name');
+            if (data) setClassrooms(data);
+        };
+
         if (isOpen) {
             fetchClassrooms();
             if (teacher) {
@@ -34,11 +48,6 @@ export default function TeacherForm({ teacher, isOpen, onClose, onSuccess }: Pro
             }
         }
     }, [isOpen, teacher]);
-
-    const fetchClassrooms = async () => {
-        const { data } = await supabase.from('classrooms').select('*').order('name');
-        if (data) setClassrooms(data);
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

@@ -1,22 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { Plus, Edit } from 'lucide-react';
 import TeacherForm from '@/components/admin/TeacherForm';
 
+interface TeacherClassroom {
+    classrooms: { name: string } | null;
+}
+
+interface TeacherProfile {
+    id: string;
+    name: string;
+    email: string;
+    teacher_classrooms: TeacherClassroom[];
+}
+
 export default function TeachersPage() {
     const supabase = createClient();
-    const [teachers, setTeachers] = useState<any[]>([]);
+    const [teachers, setTeachers] = useState<TeacherProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
-    const [editingTeacher, setEditingTeacher] = useState<any>(null);
+    const [editingTeacher, setEditingTeacher] = useState<TeacherProfile | null>(null);
 
-    useEffect(() => {
-        fetchTeachers();
-    }, []);
-
-    const fetchTeachers = async () => {
+    const fetchTeachers = useCallback(async () => {
         setLoading(true);
         // Fetch profiles with role teacher AND their assigned classrooms
         const { data: profiles, error } = await supabase
@@ -31,12 +38,16 @@ export default function TeachersPage() {
             .order('name');
 
         if (profiles) {
-            setTeachers(profiles);
+            setTeachers(profiles as unknown as TeacherProfile[]);
         }
         setLoading(false);
-    };
+    }, [supabase]);
 
-    const handleEdit = (teacher: any) => {
+    useEffect(() => {
+        fetchTeachers();
+    }, [fetchTeachers]);
+
+    const handleEdit = (teacher: TeacherProfile) => {
         setEditingTeacher(teacher);
         setIsFormOpen(true);
     };
@@ -83,7 +94,7 @@ export default function TeachersPage() {
                                     <td className="px-6 py-4 text-sm text-gray-600">{teacher.email}</td>
                                     <td className="px-6 py-4 text-sm text-gray-600">
                                         <div className="flex flex-wrap gap-1">
-                                            {teacher.teacher_classrooms?.map((tc: any, i: number) => (
+                                            {teacher.teacher_classrooms?.map((tc, i) => (
                                                 <span key={i} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs border border-blue-100">
                                                     {tc.classrooms?.name}
                                                 </span>

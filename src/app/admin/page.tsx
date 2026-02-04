@@ -41,7 +41,7 @@ export default function AdminDashboard() {
         }
 
         fetchStats();
-    }, []);
+    }, [supabase]);
 
     return (
         <div className="space-y-8">

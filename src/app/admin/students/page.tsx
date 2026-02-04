@@ -1,26 +1,33 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabaseClient';
-import { Plus, Edit, Calendar, Trash2 } from 'lucide-react';
+import { Plus, Edit, Calendar } from 'lucide-react';
 import StudentForm from '@/components/admin/StudentForm';
 import VacationModal from '@/components/admin/VacationModal';
 
+interface Student {
+    id: string;
+    first_name: string;
+    last_name: string;
+    profile_picture?: string;
+    classroom_id: string;
+    grade_id: string;
+    classrooms: { name: string } | null;
+    grades: { name: string } | null;
+}
+
 export default function StudentsPage() {
     const supabase = createClient();
-    const [students, setStudents] = useState<any[]>([]);
+    const [students, setStudents] = useState<Student[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Modals
     const [isFormOpen, setIsFormOpen] = useState(false);
-    const [editingStudent, setEditingStudent] = useState<any>(null);
-    const [vacationStudent, setVacationStudent] = useState<any>(null);
+    const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+    const [vacationStudent, setVacationStudent] = useState<Student | null>(null);
 
-    useEffect(() => {
-        fetchStudents();
-    }, []);
-
-    const fetchStudents = async () => {
+    const fetchStudents = useCallback(async () => {
         setLoading(true);
         const { data, error } = await supabase
             .from('students')
@@ -31,11 +38,15 @@ export default function StudentsPage() {
             `)
             .order('first_name');
 
-        if (data) setStudents(data);
+        if (data) setStudents(data as unknown as Student[]);
         setLoading(false);
-    };
+    }, [supabase]);
 
-    const handleEdit = (student: any) => {
+    useEffect(() => {
+        fetchStudents();
+    }, [fetchStudents]);
+
+    const handleEdit = (student: Student) => {
         setEditingStudent(student);
         setIsFormOpen(true);
     };

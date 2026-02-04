@@ -4,21 +4,40 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { Users, GraduationCap } from 'lucide-react';
 
+interface ClassroomGrade {
+    grades: {
+        name: string;
+        type: string;
+    } | null;
+}
+
+interface TeacherClassroom {
+    profiles: {
+        name: string;
+    } | null;
+}
+
+interface Classroom {
+    id: string;
+    name: string;
+    capacity: number;
+    classroom_grades: ClassroomGrade[];
+    teacher_classrooms: TeacherClassroom[];
+    students: { count: number }[];
+}
+
 export default function ClassroomsPage() {
     const supabase = createClient();
-    const [classrooms, setClassrooms] = useState<any[]>([]);
+    const [classrooms, setClassrooms] = useState<Classroom[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchClassrooms();
-    }, []);
-
-    const fetchClassrooms = async () => {
-        setLoading(true);
-        // Fetch classrooms with relationships
-        const { data, error } = await supabase
-            .from('classrooms')
-            .select(`
+        const fetchClassrooms = async () => {
+            setLoading(true);
+            // Fetch classrooms with relationships
+            const { data } = await supabase
+                .from('classrooms')
+                .select(`
                 *,
                 classroom_grades (
                     grades (name, type)
@@ -28,11 +47,14 @@ export default function ClassroomsPage() {
                 ),
                 students (count)
             `)
-            .order('name');
+                .order('name');
 
-        if (data) setClassrooms(data);
-        setLoading(false);
-    };
+            if (data) setClassrooms(data as unknown as Classroom[]);
+            setLoading(false);
+        };
+
+        fetchClassrooms();
+    }, [supabase]);
 
     return (
         <div className="space-y-6">
@@ -62,7 +84,7 @@ export default function ClassroomsPage() {
                             <div>
                                 <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Grades</p>
                                 <div className="flex flex-wrap gap-2">
-                                    {cls.classroom_grades?.map((cg: any, i: number) => (
+                                    {cls.classroom_grades?.map((cg, i) => (
                                         <span key={i} className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs border border-gray-200">
                                             {cg.grades?.name}
                                         </span>
@@ -73,7 +95,7 @@ export default function ClassroomsPage() {
                             <div>
                                 <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Assigned Teachers</p>
                                 <div className="space-y-1">
-                                    {cls.teacher_classrooms?.length > 0 ? cls.teacher_classrooms.map((tc: any, i: number) => (
+                                    {cls.teacher_classrooms?.length > 0 ? cls.teacher_classrooms.map((tc, i) => (
                                         <div key={i} className="text-sm text-gray-700 flex items-center gap-2">
                                             <div className="w-2 h-2 rounded-full bg-green-500"></div>
                                             {tc.profiles?.name}
