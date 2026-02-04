@@ -1,11 +1,20 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { User, Check, X, Clock } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Check, X, Clock } from 'lucide-react';
+import { cn } from '@/lib/utils';;
+
+interface Student {
+    id: string;
+    first_name: string;
+    last_name: string;
+    profile_picture?: string;
+    status?: string | null;
+    arrival_time?: string;
+}
 
 interface Props {
-    student: any;
+    student: Student;
     onMark: (id: string, status: 'PRESENT' | 'ABSENT' | 'LATE') => void;
     isPastCutoff: boolean;
     disabled?: boolean;
@@ -115,6 +124,7 @@ export default function SwipeableStudentItem({ student, onMark, isPastCutoff, di
                 <div className="flex items-center gap-3">
                     <div className="h-10 w-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold overflow-hidden">
                         {student.profile_picture ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
                             <img src={student.profile_picture} alt={student.first_name} className="h-full w-full object-cover" />
                         ) : (
                             student.first_name[0]
@@ -123,7 +133,7 @@ export default function SwipeableStudentItem({ student, onMark, isPastCutoff, di
                     <div>
                         <p className="font-semibold text-gray-900">{student.first_name} {student.last_name}</p>
                         <div className="flex items-center gap-2">
-                            <p className="text-xs text-gray-400 capitalize">{student.status === 'UNMARKED' ? 'Swipe to mark' : student.status}</p>
+                            <p className="text-xs text-gray-400 capitalize">{student.status === 'UNMARKED' ? 'Swipe to mark' : (student.status || 'UNMARKED')}</p>
                             {student.status === 'LATE' && student.arrival_time && (
                                 <span className="text-[10px] bg-yellow-100 text-yellow-800 px-1 rounded">
                                     {student.arrival_time.substring(0, 5)}

@@ -47,7 +47,7 @@ export default function TeacherForm({ teacher, isOpen, onClose, onSuccess }: Pro
                 setClassroomId('');
             }
         }
-    }, [isOpen, teacher]);
+    }, [isOpen, teacher, supabase]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

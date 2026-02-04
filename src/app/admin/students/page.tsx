@@ -93,6 +93,7 @@ export default function StudentsPage() {
                                         <div className="flex items-center gap-3">
                                             <div className="h-10 w-10 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 font-bold overflow-hidden border border-indigo-100">
                                                 {student.profile_picture ? (
+                                                    /* eslint-disable-next-line @next/next/no-img-element */
                                                     <img src={student.profile_picture} alt={student.first_name} className="h-full w-full object-cover" />
                                                 ) : (
                                                     student.first_name[0]

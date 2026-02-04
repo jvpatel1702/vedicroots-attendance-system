@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useCallback } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { Save, Info, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -37,25 +37,13 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
 
     const router = useRouter();
 
-    useEffect(() => {
-        fetchData();
-        // Polling for time check
-        const interval = setInterval(checkTime, 30000);
-        return () => clearInterval(interval);
-    }, [classId, isDev]);
-
-    // Re-check cutoff whenever settings or gradeType changes
-    useEffect(() => {
-        checkTime();
-    }, [settings, gradeType]);
-
-    const checkTime = () => {
+    const checkTime = useCallback(() => {
         if (!settings) return;
         const past = isPastCutoff(gradeType, settings);
         setIsPastCutoffState(past);
-    };
+    }, [gradeType, settings]);
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             // 1. Fetch School Settings
@@ -73,13 +61,9 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
             setSettings(currentSettings);
 
             // 2. Fetch Class Info (to get Grade Type)
-            // Note: In dev mode we mock this
             let currentGradeType: GradeType = 'ELEMENTARY';
 
             if (!isDev) {
-                // Fetch random student to get grade type? Or better, fetch classroom -> grades mapping.
-                // Assuming classroom links to grades, and grades have type.
-                // Join: classroom_grades -> grades
                 const { data: gradeData } = await supabase
                     .from('classroom_grades')
                     .select('grades(type)')
@@ -88,11 +72,10 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                     .single();
 
                 if (gradeData?.grades) {
-                    // @ts-ignore
-                    currentGradeType = gradeData.grades.type as GradeType;
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    currentGradeType = (gradeData.grades as any).type as GradeType;
                 }
             } else {
-                // Mock dev logic
                 if (classId.includes('kg')) currentGradeType = 'KINDERGARTEN';
             }
             setGradeType(currentGradeType);
@@ -119,9 +102,8 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                 const { data: vacationData } = await supabase
                     .from('student_vacations')
                     .select('*')
-                    .gte('end_date', date); // Only vacations ending today or future
+                    .gte('end_date', date);
 
-                // Merge and Filter
                 const merged = (studentData || [])
                     .filter(s => !isStudentOnVacation(s.id, (vacationData || []) as StudentVacation[]))
                     .map(student => {
@@ -135,7 +117,7 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                         };
                     });
 
-                setStudents(merged);
+                setStudents(merged as Student[]);
             }
 
         } catch (e) {
@@ -143,7 +125,23 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
         } finally {
             setLoading(false);
         }
-    };
+    }, [classId, date, isDev, supabase]);
+
+    useEffect(() => {
+        fetchData();
+        // Removed unused interval logic here as it is handled below
+    }, [fetchData]);
+
+    // Separate effect for time check interval
+    useEffect(() => {
+        const interval = setInterval(checkTime, 30000);
+        return () => clearInterval(interval);
+    }, [checkTime]);
+
+    // Initial check when data loaded
+    useEffect(() => {
+        checkTime();
+    }, [checkTime]);
 
     const markAttendance = (studentId: string, status: 'PRESENT' | 'ABSENT' | 'LATE') => {
         let arrivalTime = undefined;
@@ -160,7 +158,6 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
         setSaving(true);
         if (isDev) {
             await new Promise(r => setTimeout(r, 1000));
-            // alert('(Dev Mode) Saved!');
             setSaving(false);
             return;
         }
@@ -214,7 +211,8 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                 {students.map(student => (
                     <SwipeableStudentItem
                         key={student.id}
-                        student={student}
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        student={student as any}
                         onMark={markAttendance}
                         isPastCutoff={isPastCutoffState}
                     />

@@ -26,7 +26,7 @@ export default function TeachersPage() {
     const fetchTeachers = useCallback(async () => {
         setLoading(true);
         // Fetch profiles with role teacher AND their assigned classrooms
-        const { data: profiles, error } = await supabase
+        const { data: profiles } = await supabase
             .from('profiles')
             .select(`
                 *,

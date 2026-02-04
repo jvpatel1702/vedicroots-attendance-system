@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import Link from 'next/link';
-import { ChevronRight, Calendar } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { useUser } from '@/lib/useUser';
 
 interface Classroom {
@@ -33,7 +33,7 @@ export default function TeacherDashboard() {
 
             // If user is real, fetch data
             if (user && !isDev) {
-                const { data, error } = await supabase
+                const { data } = await supabase
                     .from('teacher_classrooms')
                     .select(`
               classrooms (
@@ -45,6 +45,7 @@ export default function TeacherDashboard() {
                     .eq('teacher_id', user.id);
 
                 if (data) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const formatted = data.map((item: any) => item.classrooms);
                     setClasses(formatted);
                 }
@@ -52,7 +53,7 @@ export default function TeacherDashboard() {
             }
         }
         fetchData();
-    }, [user, loading, isDev]);
+    }, [user, loading, isDev, supabase]);
 
     if (loading || dataLoading) {
         return (

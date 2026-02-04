@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react';
 import { createClient } from './supabaseClient';
+import { User } from '@supabase/supabase-js';
+
+// Define a robust User type that includes Supabase User properties we use
+export interface AppUser extends Partial<User> {
+    id: string;
+    email?: string;
+    role?: string;
+}
 
 export function useUser() {
-    const [user, setUser] = useState<any>(null);
+    const [user, setUser] = useState<AppUser | null>(null);
     const [loading, setLoading] = useState(true);
     const [isDev, setIsDev] = useState(false);
 
@@ -18,11 +26,11 @@ export function useUser() {
                     id: 'dev-user-id',
                     email: devRole === 'ADMIN' ? 'admin@dev.com' : 'teacher@dev.com',
                     role: devRole
-                });
+                } as AppUser);
             } else {
                 const supabase = createClient();
                 const { data } = await supabase.auth.getUser();
-                setUser(data.user);
+                setUser(data.user as AppUser);
             }
             setLoading(false);
         }
