@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LayoutDashboard, Users, UserCheck, FileText, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, UserCheck, FileText, Settings, LogOut, Calendar } from 'lucide-react';
 import { createClient } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 
@@ -50,6 +50,10 @@ export default function AdminLayout({
                     <Link href="/admin/attendance" className="flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition-colors">
                         <FileText size={20} />
                         <span>Attendance Logs</span>
+                    </Link>
+                    <Link href="/admin/vacations" className="flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition-colors">
+                        <Calendar size={20} />
+                        <span>Vacations</span>
                     </Link>
                     <Link href="/admin/settings" className="flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-lg transition-colors">
                         <Settings size={20} />

@@ -38,7 +38,7 @@ export default function TeacherLayout({
                     <Home size={24} />
                     <span className="text-xs font-medium">Home</span>
                 </Link>
-                <Link href="/teacher/classes" className="flex flex-col items-center gap-1 text-gray-500 hover:text-indigo-600 transition">
+                <Link href="/teacher" className="flex flex-col items-center gap-1 text-gray-500 hover:text-indigo-600 transition">
                     <Users size={24} />
                     <span className="text-xs font-medium">Classes</span>
                 </Link>
