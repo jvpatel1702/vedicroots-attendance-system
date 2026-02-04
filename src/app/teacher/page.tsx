@@ -39,14 +39,31 @@ export default function TeacherDashboard() {
               classrooms (
                 id,
                 name,
-                grade
+                classroom_grades (
+                  grades (
+                    name
+                  )
+                )
               )
             `)
                     .eq('teacher_id', user.id);
 
                 if (data) {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const formatted = data.map((item: any) => item.classrooms);
+                    const formatted = data.map((item: any) => {
+                        const cls = item.classrooms;
+                        // Map the nested grades to a comma-separated string
+                        const gradeNames = cls.classroom_grades
+                            ?.map((cg: any) => cg.grades?.name)
+                            .filter(Boolean)
+                            .join(', ');
+                        
+                        return {
+                            id: cls.id,
+                            name: cls.name,
+                            grade: gradeNames || 'No Grade Assigned'
+                        };
+                    });
                     setClasses(formatted);
                 }
                 setDataLoading(false);
