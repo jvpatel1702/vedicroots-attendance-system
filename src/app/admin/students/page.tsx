@@ -29,7 +29,7 @@ export default function StudentsPage() {
 
     const fetchStudents = useCallback(async () => {
         setLoading(true);
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('students')
             .select(`
                 *,
