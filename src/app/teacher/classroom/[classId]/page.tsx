@@ -189,6 +189,19 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
 
     const hasAnyMarked = students.length > 0 && students.some(s => s.status && s.status !== 'UNMARKED');
 
+    // Sort students: Unmarked first, then Marked
+    const sortedStudents = [...students].sort((a, b) => {
+        const aMarked = a.status && a.status !== 'UNMARKED';
+        const bMarked = b.status && b.status !== 'UNMARKED';
+
+        if (aMarked === bMarked) {
+            // If both marked or both unmarked, sort by name
+            return a.first_name.localeCompare(b.first_name);
+        }
+        // Unmarked comes first (false < true)
+        return aMarked ? 1 : -1;
+    });
+
     if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-indigo-500" /></div>;
 
     return (
@@ -214,7 +227,7 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
             </div>
 
             <div className="space-y-4">
-                {students.map(student => (
+                {sortedStudents.map(student => (
                     <SwipeableStudentItem
                         key={student.id}
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -224,21 +237,28 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                     />
                 ))}
 
-                {students.length === 0 && (
+                {sortedStudents.length === 0 && (
                     <div className="text-center py-10 text-gray-400">No students found.</div>
                 )}
             </div>
 
             {/* Save Button */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-gray-200">
-                <button
-                    onClick={saveAttendance}
-                    disabled={saving || !hasAnyMarked}
-                    className="w-full max-w-lg mx-auto bg-black text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-2 hover:bg-gray-900 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
-                >
-                    {saving ? <Loader2 className="animate-spin" /> : <Save size={20} />}
-                    {saving ? 'Saving...' : 'Submit Attendance'}
-                </button>
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-md z-50">
+                <div className="max-w-lg mx-auto">
+                    <button
+                        onClick={saveAttendance}
+                        disabled={saving || !hasAnyMarked}
+                        className="w-full bg-indigo-600 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg flex items-center justify-center gap-2 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100 disabled:bg-gray-400"
+                    >
+                        {saving ? <Loader2 className="animate-spin" /> : <Save size={20} />}
+                        {saving ? 'Saving...' : 'Submit Attendance'}
+                    </button>
+                    {!hasAnyMarked && (
+                        <p className="text-xs text-center text-gray-400 mt-2">
+                            Mark at least one student to submit.
+                        </p>
+                    )}
+                </div>
             </div>
         </div>
     );
