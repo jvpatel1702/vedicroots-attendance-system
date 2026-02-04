@@ -42,6 +42,80 @@ export default function LoginPage() {
         }
     };
 
+    const handleDemoLogin = async (role: 'ADMIN' | 'TEACHER') => {
+        setLoading(true);
+        setError(null);
+
+        const email = role === 'ADMIN' ? 'admin@vedicroots.com' : 'teacher@vedicroots.com';
+        const password = 'password123';
+        const name = role === 'ADMIN' ? 'Admin User' : 'Teacher User';
+
+        // 1. Try to Login
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+        });
+
+        if (!signInError && signInData.session) {
+            router.push(role === 'ADMIN' ? '/admin' : '/teacher');
+            return;
+        }
+
+        // 2. If login fails (assume user doesn't exist), try to SignUp
+        if (signInError && signInError.message.includes('Invalid login credentials')) {
+            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        full_name: name,
+                    }
+                }
+            });
+
+            if (signUpError) {
+                setError(`Demo setup failed: ${signUpError.message}`);
+                setLoading(false);
+                return;
+            }
+
+            if (signUpData.user) {
+                // 3. Create Profile manually if trigger didn't catch it (doing it here to be safe)
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .insert({
+                        id: signUpData.user.id,
+                        email: email,
+                        name: name,
+                        role: role
+                    })
+                    .select()
+                    .single();
+
+                // If conflict (profile already exists ignoring error), just proceed
+                if (profileError && !profileError.message.includes('duplicate key')) {
+                    console.error('Profile creation error:', profileError);
+                }
+
+                // 4. Login again to be sure (sometimes signup auto-logs in, sometimes strict email confirm prevents it)
+                // For dev/demo, we assume email confirmation is OFF or we can login immediately.
+                const { data: reSignInData, error: reSignInError } = await supabase.auth.signInWithPassword({
+                    email,
+                    password,
+                });
+
+                if (reSignInError) {
+                    setError("User created but could not login. Check Email Confirm settings.");
+                } else {
+                    router.push(role === 'ADMIN' ? '/admin' : '/teacher');
+                }
+            }
+        } else if (signInError) {
+            setError(signInError.message);
+        }
+        setLoading(false);
+    };
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
             <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-xl shadow-lg">
@@ -96,24 +170,20 @@ export default function LoginPage() {
                     <h3 className="text-center text-sm font-medium text-gray-500 mb-4">Developer Bypass</h3>
                     <div className="grid grid-cols-2 gap-4">
                         <button
-                            onClick={() => {
-                                document.cookie = "dev_role=ADMIN; path=/; max-age=3600";
-                                router.push('/admin');
-                            }}
-                            className="w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
+                            onClick={() => handleDemoLogin('ADMIN')}
+                            disabled={loading}
+                            className="w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none disabled:opacity-50"
                             type="button"
                         >
-                            Admin View
+                            Admin Demo
                         </button>
                         <button
-                            onClick={() => {
-                                document.cookie = "dev_role=TEACHER; path=/; max-age=3600";
-                                router.push('/teacher');
-                            }}
-                            className="w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
+                            onClick={() => handleDemoLogin('TEACHER')}
+                            disabled={loading}
+                            className="w-full py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none disabled:opacity-50"
                             type="button"
                         >
-                            Teacher View
+                            Teacher Demo
                         </button>
                     </div>
                 </div>

@@ -2,12 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-    const devRole = request.cookies.get('dev_role')?.value;
-
-    // Dev Bypass
-    if (devRole) {
-        return NextResponse.next();
-    }
+    // Dev Bypass check removed
 
     let response = NextResponse.next({
         request: {
