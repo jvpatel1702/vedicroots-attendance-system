@@ -27,13 +27,15 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
     const { isDev } = useUser();
 
     // State
+    // State
     const [students, setStudents] = useState<Student[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState<SchoolSettings | null>(null);
     const [gradeType, setGradeType] = useState<GradeType>('ELEMENTARY'); // Default
     const [isPastCutoffState, setIsPastCutoffState] = useState(false);
-    const [date] = useState(new Date().toISOString().split('T')[0]);
+    // Use local date string (YYYY-MM-DD) to avoid timezone issues with toISOString()
+    const [date] = useState(() => new Date().toLocaleDateString('en-CA'));
 
     const router = useRouter();
 
@@ -175,13 +177,17 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
             .from('attendance')
             .upsert(updates, { onConflict: 'student_id,date' });
 
-        if (error) alert('Error: ' + error.message);
-        else router.refresh();
+        if (error) {
+            alert('Error: ' + error.message);
+        } else {
+            router.refresh(); // Refresh server components
+            fetchData(); // Reload data to confirm persistence
+        }
 
         setSaving(false);
     };
 
-    const allMarked = students.length > 0 && students.every(s => s.status && s.status !== 'UNMARKED');
+    const hasAnyMarked = students.length > 0 && students.some(s => s.status && s.status !== 'UNMARKED');
 
     if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-indigo-500" /></div>;
 
@@ -191,7 +197,7 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                 <div className="flex items-center justify-between">
                     <h2 className="text-2xl font-bold text-gray-900">Attendance</h2>
                     <div className="text-sm text-gray-500 font-medium">
-                        {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                        {new Date(date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                     </div>
                 </div>
 
@@ -227,11 +233,11 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-gray-200">
                 <button
                     onClick={saveAttendance}
-                    disabled={saving || !allMarked}
+                    disabled={saving || !hasAnyMarked}
                     className="w-full max-w-lg mx-auto bg-black text-white font-bold py-4 px-6 rounded-2xl shadow-lg flex items-center justify-center gap-2 hover:bg-gray-900 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
                 >
                     {saving ? <Loader2 className="animate-spin" /> : <Save size={20} />}
-                    {saving ? 'Saving...' : allMarked ? 'Submit Attendance' : 'Mark All to Submit'}
+                    {saving ? 'Saving...' : 'Submit Attendance'}
                 </button>
             </div>
         </div>
