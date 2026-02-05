@@ -1,3 +1,14 @@
+/**
+ * Students Index Page (Admin)
+ * ---------------------------
+ * Displays a list of all students.
+ * 
+ * Key Data Structure:
+ * - joins `persons` to get first_name, last_name, photo.
+ * - joins `enrollments` -> `classrooms` to get current class info.
+ * 
+ * Note: strict typing here is crucial as it shapes the entire data flow.
+ */
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';

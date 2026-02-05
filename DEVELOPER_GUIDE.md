@@ -64,63 +64,61 @@ This is the core of the application routing.
 ### `database_design.md`
 For a deep dive into the data model (Relationships, Tables like `profiles`, `attendance`, `classrooms`), please refer to the [Database Design Document](./database_design.md).
 
-## 5. Getting Started
+## 5. Architecture & Data Model (UPDATED)
+
+### Core Refactor: Persons Table
+We have introduced a unified `persons` table to handle identity management across Students, Guardians, and Staff.
+-   **`persons`**: Stores shared fields (`first_name`, `last_name`, `dob`, `photo_url`, `contact_info`).
+-   **`students`**: Links to `persons` and stores student-specific data (`student_number`, `medical_info`).
+-   **`guardians`**: Links to `persons` and stores guardian-specific data.
+-   **`enrollments`**: Links `students` to `classrooms` and `grades` for a specific `academic_year`.
+
+### Key Workflows
+#### Student Enrollment (Wizard)
+-   Located at `src/components/admin/StudentForm.tsx`.
+-   A 4-step wizard process:
+    1.  **Person Info**: Creates/Selects the core person record.
+    2.  **Student Details**: Captures medical/academic info.
+    3.  **Guardians**: Links multiple guardians to the student.
+    4.  **Enrollment**: Assigns the student to a classroom/grade.
+-   **Data Flow**: The form performs a transactional write sequence (Person -> Student -> Guardians -> Links -> Enrollment).
+
+## 6. Getting Started
 
 ### Prerequisites
--   Node.js (v18 or higher recommended)
--   npm or yarn
--   A local or remote Supabase instance
+-   Node.js (v18+)
+-   Docker Desktop (Required for local Supabase)
+-   Supabase CLI (`npm install -g supabase`)
 
-### Installation
-
-1.  **Clone the repository**:
+### Local Setup
+1.  **Clone & Install**:
     ```bash
-    git clone <repository-url>
-    cd vedicroots-attendance-system
-    ```
-
-2.  **Install dependencies**:
-    ```bash
+    git clone <repo>
     npm install
     ```
-
-3.  **Environment Setup**:
-    Create a `.env.local` file in the root directory with your Supabase credentials:
+2.  **Start Local Database**:
+    Make sure Docker is running, then:
     ```bash
-    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+    npx supabase start
     ```
-
-4.  **Database Setup (Important)**:
-    -   Run the migration file: `supabase/migrations/20250601000000_update_schema.sql` to create new tables and update columns.
-    -   Run the seed file: `supabase/seed.sql` to populate the specific 2025-2026 classroom structure (KG 1, KG 2, Lower/Upper Elementary).
-
-5.  **Run Development Server**:
+3.  **Apply Schema & Seed Data**:
+    If you need to reset the database to a clean state with test data:
+    ```bash
+    npx supabase db reset
+    ```
+4.  **Run App**:
     ```bash
     npm run dev
     ```
-    Open [http://localhost:3000](http://localhost:3000) with your browser.
 
-## 6. Development Guidelines
+## 7. Folder Structure
+-   `src/app`: App Router pages.
+-   `src/components/admin`: Admin-specific components (StudentForm, VacationModal).
+-   `supabase/migrations`: SQL history.
+-   `supabase/seed.sql`: Test data generation.
 
-*   **Type Safety**: Always define interfaces or types for props and data objects. Avoid using `any`.
-*   **Server vs Client Components**: 
-    -   Use Server Components (default in Next.js 15) for data fetching.
-    -   Use Client Components (`'use client'`) only when interactivity (hooks, event listeners) is needed.
-*   **Styling**: Use utility classes from Tailwind CSS. Avoid writing custom CSS files unless necessary for global styles.
+## 8. Development Guidelines
+-   **Strict Types**: We are moving towards strict TypeScript. Ensure `Student` interfaces matches the database joins (see `src/app/admin/students/page.tsx`).
+-   **Supabase Client**: Use `createClient()` from `@/lib/supabaseClient` for client-side operations.
+-   **UI Library**: Tailwind CSS + Shadcn UI (in `src/components/ui`).
 
-## 7. Common Workflows
-
-### Adding a New Page
-1.  Determine the role access needed (Admin or Teacher).
-2.  Create a folder in `src/app/admin` or `src/app/teacher`.
-3.  Add a `page.tsx` file.
-4.  Implement the UI and data fetching.
-
-### Modifying the Database
-1.  Update the SQL definitions in Supabase.
-2.  Update `database_design.md` to reflect the changes.
-3.  If using TypeScript types for Supabase, assume they need to be regenerated or updated manually if not automated.
-
----
-*Maintained by the creating agent and development team.*
