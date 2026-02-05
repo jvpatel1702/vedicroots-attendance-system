@@ -1,23 +1,25 @@
 -- Drop tables if they exist to allow clean reset (Order matters for foreign keys)
-drop table if exists public.invoice_items;
-drop table if exists public.invoices;
-drop table if exists public.fee_structures;
-drop table if exists public.attendance;
-drop table if exists public.student_medical;
-drop table if exists public.student_guardians;
-drop table if exists public.guardians;
-drop table if exists public.enrollments;
-drop table if exists public.teacher_classrooms;
-drop table if exists public.classroom_grades;
-drop table if exists public.students;
-drop table if exists public.classrooms;
-drop table if exists public.grades;
-drop table if exists public.programs;
-drop table if exists public.school_settings;
-drop table if exists public.locations;
-drop table if exists public.academic_years;
-drop table if exists public.organizations;
-drop table if exists public.profiles;
+-- Using CASCADE to automatically drop dependent foreign keys and constraints
+drop table if exists public.invoice_items cascade;
+drop table if exists public.invoices cascade;
+drop table if exists public.fee_structures cascade;
+drop table if exists public.attendance cascade;
+drop table if exists public.student_medical cascade;
+drop table if exists public.student_vacations cascade; -- Explicitly dropping this remnant
+drop table if exists public.student_guardians cascade;
+drop table if exists public.guardians cascade;
+drop table if exists public.enrollments cascade;
+drop table if exists public.teacher_classrooms cascade;
+drop table if exists public.classroom_grades cascade;
+drop table if exists public.students cascade;
+drop table if exists public.classrooms cascade;
+drop table if exists public.grades cascade;
+drop table if exists public.programs cascade;
+drop table if exists public.school_settings cascade;
+drop table if exists public.locations cascade;
+drop table if exists public.academic_years cascade;
+drop table if exists public.organizations cascade;
+drop table if exists public.profiles cascade;
 
 -- 1. Profiles (Linked to Auth)
 create table public.profiles (

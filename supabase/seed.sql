@@ -1,83 +1,70 @@
 -- Seed data for VedicRoots Attendance System (System Documentation 2025-2026)
--- Updated: Fixed 's' UUID error (replaced with 'd' for valid hex)
+-- Updated for Multi-Location Schema
+-- FIXED: Used only valid hex chars (0-9, a-f) for UUIDs
 
--- 1. Academic Year
-INSERT INTO public.academic_years (id, name, start_date, end_date, active)
-VALUES ('a2025000-0000-0000-0000-000000000001', '2025-2026', '2025-09-01', '2026-06-26', true)
+-- 1. Organizations (Prefix 'aa...')
+INSERT INTO public.organizations (id, name, type) VALUES
+('aa000000-0000-0000-0000-000000000001', 'Vedic Roots School', 'SCHOOL'),
+('aa000000-0000-0000-0000-000000000002', 'Vedic Roots Daycare', 'DAYCARE')
 ON CONFLICT (id) DO NOTHING;
 
--- 2. School Settings
--- Fixed: Used 'd' instead of 's' (s is not valid hex)
-INSERT INTO public.school_settings (id, school_name, current_academic_year_id, cutoff_time_kg, cutoff_time_elementary, late_fee_per_minute)
-VALUES ('d0000000-0000-0000-0000-000000000001', 'VedicRoots', 'a2025000-0000-0000-0000-000000000001', '09:15:00', '09:00:00', 1.00)
+-- 2. Locations (Prefix 'bb...')
+INSERT INTO public.locations (id, organization_id, name, address, capacity) VALUES
+('bb000000-0000-0000-0000-000000000001', 'aa000000-0000-0000-0000-000000000001', 'Main Campus', '123 Vedic Way', 500)
 ON CONFLICT (id) DO NOTHING;
 
--- 3. Grades
-INSERT INTO public.grades (id, name, "order", type) VALUES
-('b0000000-0000-0000-0000-000000000001', 'JK', 1, 'KINDERGARTEN'),
-('b0000000-0000-0000-0000-000000000002', 'SK', 2, 'KINDERGARTEN'),
-('b0000000-0000-0000-0000-000000000003', 'Grade 1', 3, 'ELEMENTARY'),
-('b0000000-0000-0000-0000-000000000004', 'Grade 2', 4, 'ELEMENTARY'),
-('b0000000-0000-0000-0000-000000000005', 'Grade 3', 5, 'ELEMENTARY'),
-('b0000000-0000-0000-0000-000000000006', 'Grade 4', 6, 'ELEMENTARY'),
-('b0000000-0000-0000-0000-000000000007', 'Grade 5', 7, 'ELEMENTARY'),
-('b0000000-0000-0000-0000-000000000008', 'Grade 6', 8, 'ELEMENTARY'),
-('b0000000-0000-0000-0000-000000000009', 'Grade 7', 9, 'ELEMENTARY')
+-- 3. Academic Year (Prefix 'cc...')
+INSERT INTO public.academic_years (id, name, start_date, end_date, is_active) VALUES
+('cc000000-0000-0000-0000-000000000001', '2025-2026', '2025-09-01', '2026-06-26', true)
 ON CONFLICT (id) DO NOTHING;
 
--- 4. Classrooms
-INSERT INTO public.classrooms (id, name, capacity) VALUES
-('c1000000-0000-0000-0000-000000000001', 'KG 1', 20),
-('c2000000-0000-0000-0000-000000000002', 'KG 2', 20),
-('c3000000-0000-0000-0000-000000000003', 'Lower Elementary', 30),
-('c4000000-0000-0000-0000-000000000004', 'Upper Elementary', 30)
+-- 4. School Settings (Prefix 'dd...')
+INSERT INTO public.school_settings (id, organization_id, cutoff_time, late_fee_per_minute) VALUES
+('dd000000-0000-0000-0000-000000000001', 'aa000000-0000-0000-0000-000000000001', '09:00:00', 1.00)
 ON CONFLICT (id) DO NOTHING;
 
--- 5. Classroom Grades Mapping
-INSERT INTO public.classroom_grades (classroom_id, grade_id) VALUES
-('c1000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001'), -- KG 1 -> JK
-('c1000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000002'), -- KG 1 -> SK
-('c2000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000001'), -- KG 2 -> JK
-('c2000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000002'), -- KG 2 -> SK
-('c3000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000003'), -- Gr 1
-('c3000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000004'), -- Gr 2
-('c3000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000005'), -- Gr 3
-('c4000000-0000-0000-0000-000000000004', 'b0000000-0000-0000-0000-000000000006'), -- Gr 4
-('c4000000-0000-0000-0000-000000000004', 'b0000000-0000-0000-0000-000000000007'), -- Gr 5
-('c4000000-0000-0000-0000-000000000004', 'b0000000-0000-0000-0000-000000000008'), -- Gr 6
-('c4000000-0000-0000-0000-000000000004', 'b0000000-0000-0000-0000-000000000009')  -- Gr 7
-ON CONFLICT (classroom_id, grade_id) DO NOTHING;
+-- 5. Programs (Prefix 'ee...')
+INSERT INTO public.programs (id, organization_id, name) VALUES
+('ee000000-0000-0000-0000-000000000001', 'aa000000-0000-0000-0000-000000000001', 'Elementary'),
+('ee000000-0000-0000-0000-000000000002', 'aa000000-0000-0000-0000-000000000001', 'Kindergarten')
+ON CONFLICT (id) DO NOTHING;
 
--- 6. Students
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM public.students WHERE first_name = 'Aarav' AND last_name = 'Sharma') THEN
-        INSERT INTO public.students (first_name, last_name, classroom_id, grade_id) VALUES
-        ('Aarav', 'Sharma', 'c1000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001');
-    END IF;
+-- 6. Grades (Prefix 'ff...')
+INSERT INTO public.grades (id, program_id, name, "order") VALUES
+('ff000000-0000-0000-0000-000000000001', 'ee000000-0000-0000-0000-000000000002', 'JK', 1),
+('ff000000-0000-0000-0000-000000000002', 'ee000000-0000-0000-0000-000000000002', 'SK', 2),
+('ff000000-0000-0000-0000-000000000003', 'ee000000-0000-0000-0000-000000000001', 'Grade 1', 3),
+('ff000000-0000-0000-0000-000000000004', 'ee000000-0000-0000-0000-000000000001', 'Grade 2', 4),
+('ff000000-0000-0000-0000-000000000005', 'ee000000-0000-0000-0000-000000000001', 'Grade 3', 5),
+('ff000000-0000-0000-0000-000000000006', 'ee000000-0000-0000-0000-000000000001', 'Grade 4', 6),
+('ff000000-0000-0000-0000-000000000007', 'ee000000-0000-0000-0000-000000000001', 'Grade 5', 7),
+('ff000000-0000-0000-0000-000000000008', 'ee000000-0000-0000-0000-000000000001', 'Grade 6', 8),
+('ff000000-0000-0000-0000-000000000009', 'ee000000-0000-0000-0000-000000000001', 'Grade 7', 9)
+ON CONFLICT (id) DO NOTHING;
 
-    IF NOT EXISTS (SELECT 1 FROM public.students WHERE first_name = 'Ishani' AND last_name = 'Verma') THEN
-        INSERT INTO public.students (first_name, last_name, classroom_id, grade_id) VALUES
-        ('Ishani', 'Verma', 'c1000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000002');
-    END IF;
+-- 7. Classrooms (Prefix '11...')
+INSERT INTO public.classrooms (id, location_id, name, capacity) VALUES
+('11000000-0000-0000-0000-000000000001', 'bb000000-0000-0000-0000-000000000001', 'KG 1', 20),
+('11000000-0000-0000-0000-000000000002', 'bb000000-0000-0000-0000-000000000001', 'KG 2', 20),
+('11000000-0000-0000-0000-000000000003', 'bb000000-0000-0000-0000-000000000001', 'Lower Elementary', 30),
+('11000000-0000-0000-0000-000000000004', 'bb000000-0000-0000-0000-000000000001', 'Upper Elementary', 30)
+ON CONFLICT (id) DO NOTHING;
 
-    IF NOT EXISTS (SELECT 1 FROM public.students WHERE first_name = 'Vihaan' AND last_name = 'Gupta') THEN
-        INSERT INTO public.students (first_name, last_name, classroom_id, grade_id) VALUES
-        ('Vihaan', 'Gupta', 'c2000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000001');
-    END IF;
+-- 8. Classroom Grades Mapping
+-- (Mapping omitted for phase 1 seed simplicity, app derives logic)
 
-    IF NOT EXISTS (SELECT 1 FROM public.students WHERE first_name = 'Ananya' AND last_name = 'Iyer') THEN
-        INSERT INTO public.students (first_name, last_name, classroom_id, grade_id) VALUES
-        ('Ananya', 'Iyer', 'c3000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000003');
-    END IF;
+-- 9. Students (Prefix '22...')
+INSERT INTO public.students (id, first_name, last_name, dob, gender, student_number) VALUES
+('22000000-0000-0000-0000-000000000001', 'Aarav', 'Sharma', '2019-05-15', 'Male', 'S1001'),
+('22000000-0000-0000-0000-000000000002', 'Ishani', 'Verma', '2020-03-20', 'Female', 'S1002'),
+('22000000-0000-0000-0000-000000000003', 'Vihaan', 'Gupta', '2019-08-10', 'Male', 'S1003'),
+('22000000-0000-0000-0000-000000000004', 'Myra', 'Singh', '2015-11-25', 'Female', 'S1004')
+ON CONFLICT (id) DO NOTHING;
 
-    IF NOT EXISTS (SELECT 1 FROM public.students WHERE first_name = 'Reyansh' AND last_name = 'Malhotra') THEN
-        INSERT INTO public.students (first_name, last_name, classroom_id, grade_id) VALUES
-        ('Reyansh', 'Malhotra', 'c3000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000005');
-    END IF;
-
-    IF NOT EXISTS (SELECT 1 FROM public.students WHERE first_name = 'Myra' AND last_name = 'Singh') THEN
-        INSERT INTO public.students (first_name, last_name, classroom_id, grade_id) VALUES
-        ('Myra', 'Singh', 'c4000000-0000-0000-0000-000000000004', 'b0000000-0000-0000-0000-000000000008');
-    END IF;
-END $$;
+-- 10. Enrollments (Prefix '33...')
+INSERT INTO public.enrollments (student_id, classroom_id, grade_id, academic_year_id) VALUES
+('22000000-0000-0000-0000-000000000001', '11000000-0000-0000-0000-000000000001', 'ff000000-0000-0000-0000-000000000001', 'cc000000-0000-0000-0000-000000000001'), -- Aarav -> KG 1 -> JK
+('22000000-0000-0000-0000-000000000002', '11000000-0000-0000-0000-000000000001', 'ff000000-0000-0000-0000-000000000002', 'cc000000-0000-0000-0000-000000000001'), -- Ishani -> KG 1 -> SK
+('22000000-0000-0000-0000-000000000003', '11000000-0000-0000-0000-000000000002', 'ff000000-0000-0000-0000-000000000001', 'cc000000-0000-0000-0000-000000000001'), -- Vihaan -> KG 2 -> JK
+('22000000-0000-0000-0000-000000000004', '11000000-0000-0000-0000-000000000004', 'ff000000-0000-0000-0000-000000000006', 'cc000000-0000-0000-0000-000000000001')  -- Myra -> Upper -> Grade 4
+ON CONFLICT DO NOTHING;
