@@ -86,8 +86,10 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                     .limit(1)
                     .single();
 
-                if (gradeData?.grades?.programs?.name) {
-                    const progName = gradeData.grades.programs.name.toUpperCase();
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const gData = gradeData as any;
+                if (gData?.grades?.programs?.name) {
+                    const progName = gData.grades.programs.name.toUpperCase();
                     if (progName.includes('KINDERGARTEN')) {
                         currentGradeType = 'KINDERGARTEN';
                     }
@@ -112,7 +114,8 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                     .eq('classroom_id', classId)
                     .eq('status', 'ACTIVE'); // Only active
 
-                const studentData = enrollmentData?.map(e => e.students).flat() || [];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const studentData = enrollmentData?.map((e: any) => e.students).flat().filter(Boolean) || [];
 
                 // Sort by first name
                 // studentData.sort((a,b) => a.first_name.localeCompare(b.first_name));
