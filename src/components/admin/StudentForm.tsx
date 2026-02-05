@@ -198,7 +198,7 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-                                    <input type="date" value={formData.dob} onChange={e => updateData('dob', e.target.value)} className="input-std w-full border p-2 rounded-lg" />
+                                    <input type="date" value={formData.dob} onChange={e => updateData('dob', e.target.value)} max={new Date().toISOString().split('T')[0]} className="input-std w-full border p-2 rounded-lg" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Photo Upload</label>
