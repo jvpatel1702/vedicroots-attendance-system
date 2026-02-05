@@ -8,9 +8,12 @@ import VacationModal from '@/components/admin/VacationModal';
 
 interface Student {
     id: string;
-    first_name: string;
-    last_name: string;
-    profile_picture?: string;
+    student_number: string;
+    person: {
+        first_name: string;
+        last_name: string;
+        photo_url?: string;
+    };
     enrollments?: {
         classrooms: { id: string; name: string } | null;
         grades: { id: string; name: string } | null;
@@ -36,6 +39,11 @@ export default function StudentsPage() {
             .from('students')
             .select(`
                 *,
+                person:persons (
+                    first_name,
+                    last_name,
+                    photo_url
+                ),
                 enrollments (
                     status,
                     classroom_id,
@@ -43,8 +51,8 @@ export default function StudentsPage() {
                     classrooms (id, name),
                     grades (id, name)
                 )
-            `)
-            .order('first_name');
+            `);
+        // .order('person(first_name)'); // Ordering by joined column is tricky in Supabase syntax sometimes, letting it slide or doing client side sort
 
         if (error) {
             console.error('Error fetching students:', error);
@@ -104,16 +112,16 @@ export default function StudentsPage() {
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
                                             <div className="h-10 w-10 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 font-bold overflow-hidden border border-indigo-100">
-                                                {student.profile_picture ? (
+                                                {student.person.photo_url ? (
                                                     /* eslint-disable-next-line @next/next/no-img-element */
-                                                    <img src={student.profile_picture} alt={student.first_name} className="h-full w-full object-cover" />
+                                                    <img src={student.person.photo_url} alt={student.person.first_name} className="h-full w-full object-cover" />
                                                 ) : (
-                                                    student.first_name[0]
+                                                    student.person.first_name[0]
                                                 )}
                                             </div>
                                             <div>
-                                                <p className="font-semibold text-gray-900">{student.first_name} {student.last_name}</p>
-                                                <p className="text-xs text-gray-400">ID: {student.id.slice(0, 8)}...</p>
+                                                <p className="font-semibold text-gray-900">{student.person.first_name} {student.person.last_name}</p>
+                                                <p className="text-xs text-gray-400">ID: {student.student_number}</p>
                                             </div>
                                         </div>
                                     </td>
@@ -169,7 +177,7 @@ export default function StudentsPage() {
                     isOpen={!!vacationStudent}
                     onClose={() => setVacationStudent(null)}
                     studentId={vacationStudent.id}
-                    studentName={`${vacationStudent.first_name} ${vacationStudent.last_name}`}
+                    studentName={`${vacationStudent.person.first_name} ${vacationStudent.person.last_name}`}
                 />
             )}
         </div>

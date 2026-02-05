@@ -9,7 +9,7 @@ interface Props {
     isOpen: boolean;
     onClose: () => void;
     studentId: string;
-    studentName: string;
+    studentName: string; // Passed as prop still, simpler to keep
 }
 
 interface Vacation {

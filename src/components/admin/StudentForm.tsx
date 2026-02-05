@@ -150,12 +150,109 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
     };
 
     const handleSubmit = async () => {
-        console.log("Submitting Packet:", formData);
-        // Here we would call the future backend API
-        // For now, we mock success to validate UI flow
-        alert("Student Enrollment Packet Captured! check console for object.");
-        onSuccess();
-        onClose();
+        try {
+            // 1. Create Person for Student
+            const { data: personData, error: personError } = await supabase
+                .from('persons')
+                .insert({
+                    first_name: formData.firstName,
+                    last_name: formData.lastName,
+                    dob: formData.dob || null,
+                    photo_url: formData.photoUrl || null,
+                    organization_id: formData.organizationId
+                })
+                .select()
+                .single();
+
+            if (personError) throw personError;
+
+            // 2. Create Student Record
+            const { data: studentData, error: studentError } = await supabase
+                .from('students')
+                .insert({
+                    person_id: personData.id,
+                    student_number: formData.studentNumber || `S${Math.floor(Math.random() * 10000)}`,
+                    allergies: formData.allergies,
+                    medical_conditions: formData.medicalConditions,
+                    medications: formData.medications,
+                    doctor_name: formData.doctorName,
+                    doctor_phone: formData.doctorPhone,
+                    tenant_id: formData.organizationId // Assuming tenant_id matches org_id
+                })
+                .select()
+                .single();
+
+            if (studentError) throw studentError;
+
+            // 3. Process Guardians
+            for (const g of formData.guardians) {
+                // For simplicity in this wizard, we assume new persons for guardians.
+                // In a real app we'd search existing.
+                const { data: gPerson, error: gPersonError } = await supabase
+                    .from('persons')
+                    .insert({
+                        first_name: g.firstName,
+                        last_name: g.lastName,
+                        organization_id: formData.organizationId
+                    })
+                    .select()
+                    .single();
+
+                if (gPersonError) throw gPersonError;
+
+                const { data: guardianData, error: guardianError } = await supabase
+                    .from('guardians')
+                    .insert({
+                        person_id: gPerson.id,
+                        tenant_id: formData.organizationId
+                    })
+                    .select()
+                    .single();
+
+                if (guardianError) throw guardianError;
+
+                // Link Student-Guardian
+                const { error: linkError } = await supabase
+                    .from('student_guardians') // Note: In schema it was student_guardian_relationships or student_guardians. Checking schema...
+                    // Schema: student_guardians (student_id, guardian_id, relationship...)
+                    .insert({
+                        student_id: studentData.id,
+                        guardian_id: guardianData.id,
+                        relationship: g.relationship,
+                        is_emergency_contact: g.isEmergency,
+                        is_pickup_authorized: g.isPickup,
+                        tenant_id: formData.organizationId
+                    });
+
+                if (linkError) throw linkError;
+            }
+
+            // 4. Create Enrollment
+            if (formData.classroomId && formData.gradeId) {
+                // Need academic year
+                const { data: year } = await supabase.from('academic_years').select('id').eq('is_active', true).single();
+                if (year) {
+                    const { error: enrollError } = await supabase
+                        .from('enrollments')
+                        .insert({
+                            student_id: studentData.id,
+                            classroom_id: formData.classroomId,
+                            grade_id: formData.gradeId,
+                            academic_year_id: year.id,
+                            status: 'ACTIVE',
+                            enrollment_date: formData.enrollmentDate
+                        });
+                    if (enrollError) throw enrollError;
+                }
+            }
+
+            onSuccess();
+            onClose();
+
+        } catch (error: any) {
+            console.error(error);
+            alert("Error saving: " + error.message);
+        }
     };
 
     if (!isOpen) return null;

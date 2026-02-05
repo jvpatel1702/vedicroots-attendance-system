@@ -1,48 +1,35 @@
--- Seed data for VedicRoots Attendance System (System Documentation 2025-2026)
--- Updated for Multi-Location Schema
--- FIXED: Used only valid hex chars (0-9, a-f) for UUIDs
-
--- 1. Organizations (Prefix 'aa...')
+-- Seed data for VedicRoots Attendance System (People Management Refactor)
+-- 1. Organizations
 INSERT INTO public.organizations (id, name, type) VALUES
 ('aa000000-0000-0000-0000-000000000001', 'Vedic Roots School', 'SCHOOL'),
 ('aa000000-0000-0000-0000-000000000002', 'Vedic Roots Daycare', 'DAYCARE')
 ON CONFLICT (id) DO NOTHING;
 
--- 2. Locations (Prefix 'bb...')
+-- 2. Locations
 INSERT INTO public.locations (id, organization_id, name, address, capacity) VALUES
 ('bb000000-0000-0000-0000-000000000001', 'aa000000-0000-0000-0000-000000000001', 'Main Campus', '123 Vedic Way', 500)
 ON CONFLICT (id) DO NOTHING;
 
--- 3. Academic Year (Prefix 'cc...')
+-- 3. Academic Year
 INSERT INTO public.academic_years (id, name, start_date, end_date, is_active) VALUES
 ('cc000000-0000-0000-0000-000000000001', '2025-2026', '2025-09-01', '2026-06-26', true)
 ON CONFLICT (id) DO NOTHING;
 
--- 4. School Settings (Prefix 'dd...')
-INSERT INTO public.school_settings (id, organization_id, cutoff_time, late_fee_per_minute) VALUES
-('dd000000-0000-0000-0000-000000000001', 'aa000000-0000-0000-0000-000000000001', '09:00:00', 1.00)
-ON CONFLICT (id) DO NOTHING;
-
--- 5. Programs (Prefix 'ee...')
+-- 4. Programs
 INSERT INTO public.programs (id, organization_id, name) VALUES
 ('ee000000-0000-0000-0000-000000000001', 'aa000000-0000-0000-0000-000000000001', 'Elementary'),
 ('ee000000-0000-0000-0000-000000000002', 'aa000000-0000-0000-0000-000000000001', 'Kindergarten')
 ON CONFLICT (id) DO NOTHING;
 
--- 6. Grades (Prefix 'ff...')
+-- 5. Grades
 INSERT INTO public.grades (id, program_id, name, "order") VALUES
 ('ff000000-0000-0000-0000-000000000001', 'ee000000-0000-0000-0000-000000000002', 'JK', 1),
 ('ff000000-0000-0000-0000-000000000002', 'ee000000-0000-0000-0000-000000000002', 'SK', 2),
 ('ff000000-0000-0000-0000-000000000003', 'ee000000-0000-0000-0000-000000000001', 'Grade 1', 3),
-('ff000000-0000-0000-0000-000000000004', 'ee000000-0000-0000-0000-000000000001', 'Grade 2', 4),
-('ff000000-0000-0000-0000-000000000005', 'ee000000-0000-0000-0000-000000000001', 'Grade 3', 5),
-('ff000000-0000-0000-0000-000000000006', 'ee000000-0000-0000-0000-000000000001', 'Grade 4', 6),
-('ff000000-0000-0000-0000-000000000007', 'ee000000-0000-0000-0000-000000000001', 'Grade 5', 7),
-('ff000000-0000-0000-0000-000000000008', 'ee000000-0000-0000-0000-000000000001', 'Grade 6', 8),
-('ff000000-0000-0000-0000-000000000009', 'ee000000-0000-0000-0000-000000000001', 'Grade 7', 9)
+('ff000000-0000-0000-0000-000000000004', 'ee000000-0000-0000-0000-000000000001', 'Grade 2', 4)
 ON CONFLICT (id) DO NOTHING;
 
--- 7. Classrooms (Prefix '11...')
+-- 6. Classrooms
 INSERT INTO public.classrooms (id, location_id, name, capacity) VALUES
 ('11000000-0000-0000-0000-000000000001', 'bb000000-0000-0000-0000-000000000001', 'KG 1', 20),
 ('11000000-0000-0000-0000-000000000002', 'bb000000-0000-0000-0000-000000000001', 'KG 2', 20),
@@ -50,21 +37,29 @@ INSERT INTO public.classrooms (id, location_id, name, capacity) VALUES
 ('11000000-0000-0000-0000-000000000004', 'bb000000-0000-0000-0000-000000000001', 'Upper Elementary', 30)
 ON CONFLICT (id) DO NOTHING;
 
--- 8. Classroom Grades Mapping
--- (Mapping omitted for phase 1 seed simplicity, app derives logic)
-
--- 9. Students (Prefix '22...')
-INSERT INTO public.students (id, first_name, last_name, dob, gender, student_number) VALUES
-('22000000-0000-0000-0000-000000000001', 'Aarav', 'Sharma', '2019-05-15', 'Male', 'S1001'),
-('22000000-0000-0000-0000-000000000002', 'Ishani', 'Verma', '2020-03-20', 'Female', 'S1002'),
-('22000000-0000-0000-0000-000000000003', 'Vihaan', 'Gupta', '2019-08-10', 'Male', 'S1003'),
-('22000000-0000-0000-0000-000000000004', 'Myra', 'Singh', '2015-11-25', 'Female', 'S1004')
+-- 7. Persons (New)
+INSERT INTO public.persons (id, first_name, last_name, dob, organization_id) VALUES
+('p0000000-0000-0000-0000-000000000001', 'Aarav', 'Sharma', '2019-05-15', 'aa000000-0000-0000-0000-000000000001'),
+('p0000000-0000-0000-0000-000000000002', 'Ishani', 'Verma', '2020-03-20', 'aa000000-0000-0000-0000-000000000001'),
+('p0000000-0000-0000-0000-000000000003', 'Vihaan', 'Gupta', '2019-08-10', 'aa000000-0000-0000-0000-000000000001'),
+('p0000000-0000-0000-0000-000000000004', 'Myra', 'Singh', '2015-11-25', 'aa000000-0000-0000-0000-000000000001')
 ON CONFLICT (id) DO NOTHING;
 
--- 10. Enrollments (Prefix '33...')
-INSERT INTO public.enrollments (student_id, classroom_id, grade_id, academic_year_id) VALUES
-('22000000-0000-0000-0000-000000000001', '11000000-0000-0000-0000-000000000001', 'ff000000-0000-0000-0000-000000000001', 'cc000000-0000-0000-0000-000000000001'), -- Aarav -> KG 1 -> JK
-('22000000-0000-0000-0000-000000000002', '11000000-0000-0000-0000-000000000001', 'ff000000-0000-0000-0000-000000000002', 'cc000000-0000-0000-0000-000000000001'), -- Ishani -> KG 1 -> SK
-('22000000-0000-0000-0000-000000000003', '11000000-0000-0000-0000-000000000002', 'ff000000-0000-0000-0000-000000000001', 'cc000000-0000-0000-0000-000000000001'), -- Vihaan -> KG 2 -> JK
-('22000000-0000-0000-0000-000000000004', '11000000-0000-0000-0000-000000000004', 'ff000000-0000-0000-0000-000000000006', 'cc000000-0000-0000-0000-000000000001')  -- Myra -> Upper -> Grade 4
-ON CONFLICT DO NOTHING;
+-- 8. Students (Refactored)
+-- Note: first_name/last_name/dob in 'students' are legacy now, but might be required by NOT NULL constraint 
+-- until we drop them. For this seed, we will include them to satisfy constraints if they exist, 
+-- but primary data is in persons.
+INSERT INTO public.students (id, person_id, first_name, last_name, dob, student_number) VALUES
+('22000000-0000-0000-0000-000000000001', 'p0000000-0000-0000-0000-000000000001', 'Aarav', 'Sharma', '2019-05-15', 'S1001'),
+('22000000-0000-0000-0000-000000000002', 'p0000000-0000-0000-0000-000000000002', 'Ishani', 'Verma', '2020-03-20', 'S1002'),
+('22000000-0000-0000-0000-000000000003', 'p0000000-0000-0000-0000-000000000003', 'Vihaan', 'Gupta', '2019-08-10', 'S1003'),
+('22000000-0000-0000-0000-000000000004', 'p0000000-0000-0000-0000-000000000004', 'Myra', 'Singh', '2015-11-25', 'S1004')
+ON CONFLICT (id) DO NOTHING;
+
+-- 9. Enrollments
+INSERT INTO public.enrollments (student_id, classroom_id, grade_id, academic_year_id, status) VALUES
+('22000000-0000-0000-0000-000000000001', '11000000-0000-0000-0000-000000000001', 'ff000000-0000-0000-0000-000000000001', 'cc000000-0000-0000-0000-000000000001', 'ACTIVE'), -- Aarav -> KG 1 -> JK
+('22000000-0000-0000-0000-000000000002', '11000000-0000-0000-0000-000000000001', 'ff000000-0000-0000-0000-000000000002', 'cc000000-0000-0000-0000-000000000001', 'ACTIVE'), -- Ishani -> KG 1 -> SK
+('22000000-0000-0000-0000-000000000003', '11000000-0000-0000-0000-000000000002', 'ff000000-0000-0000-0000-000000000001', 'cc000000-0000-0000-0000-000000000001', 'ACTIVE'), -- Vihaan -> KG 2 -> JK
+('22000000-0000-0000-0000-000000000004', '11000000-0000-0000-0000-000000000004', 'ff000000-0000-0000-0000-000000000006', 'cc000000-0000-0000-0000-000000000001', 'ACTIVE')  -- Myra -> Upper -> Grade 4
+ON CONFLICT (id) DO NOTHING;
