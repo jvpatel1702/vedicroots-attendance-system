@@ -59,16 +59,8 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                 const { data: settingsData } = await supabase.from('school_settings').select('*').single();
                 if (settingsData) {
                     currentSettings = {
-                        cutoff_time_kg: settingsData.cutoff_time || '09:15:00', // Map if column names changed? Schema says 'cutoff_time' generally? 
-                        // Wait, schema has 'cutoff_time', logic requires separate. 
-                        // For Phase 1, I put cutoff_time in school_settings, but logic needs specific.
-                        // I will assume for now I should fetch based on Program or just use logic.
-                        // Let's check schema again. `school_settings` has `cutoff_time`.
-                        // The `isPastCutoff` util expects `cutoff_time_kg` and `cutoff_time_elementary`.
-                        // I'll map it manually or fetch separate if I added separate logic.
-                        // In Seed, I put `cutoff_time` = 09:00.
-                        // I'll hardcode or adapt.
-                        cutoff_time_kg: '09:15:00', // Default
+                        // In Seed, cutoff_time is 09:00. Adapting for simple logic:
+                        cutoff_time_kg: '09:15:00', // Hardcoded default for now
                         cutoff_time_elementary: settingsData.cutoff_time || '09:00:00'
                     };
                 }
