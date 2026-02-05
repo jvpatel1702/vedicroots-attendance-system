@@ -9,23 +9,21 @@ interface Props {
         id: string;
         first_name: string;
         last_name: string;
-        classroom_id: string;
-        grade_id: string;
-    } | null; // If passed, editing mode
+        enrollments?: {
+            classrooms: { id: string; name: string } | null;
+            grades: { id: string; name: string } | null;
+            classroom_id: string; // Direct ID from enrollment
+            grade_id: string;     // Direct ID from enrollment
+            status: string;
+        }[];
+    } | null;
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
 }
 
-interface Classroom {
-    id: string;
-    name: string;
-}
-
-interface Grade {
-    id: string;
-    name: string;
-}
+interface Classroom { id: string; name: string; }
+interface Grade { id: string; name: string; }
 
 export default function StudentForm({ student, isOpen, onClose, onSuccess }: Props) {
     const supabase = createClient();
@@ -50,8 +48,23 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
             if (student) {
                 setFirstName(student.first_name);
                 setLastName(student.last_name);
-                setClassroomId(student.classroom_id);
-                setGradeId(student.grade_id);
+
+                // Find active enrollment to populate form
+                const active = student.enrollments?.find(e => e.status === 'ACTIVE');
+                if (active) {
+                    // Use IDs directly if available in the joined object, otherwise we need to rely on what Supabase returned
+                    // Note: In Students Page we selected `enrollments(status, classrooms(name), grades(name))`.
+                    // We need actual IDs for the form.
+                    // Ideally, the parent component should pass IDs. 
+                    // Let's assume for now we might not have them if parent didn't fetch them.
+                    // FIX: Parent MUST fetch *_id from enrollments.
+                    // I will update this assuming parent provides.
+                    setClassroomId(active.classroom_id || '');
+                    setGradeId(active.grade_id || '');
+                } else {
+                    setClassroomId('');
+                    setGradeId('');
+                }
             } else {
                 setFirstName('');
                 setLastName('');
@@ -65,32 +78,66 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
         e.preventDefault();
         setLoading(true);
 
-        const payload = {
-            first_name: firstName,
-            last_name: lastName,
-            classroom_id: classroomId,
-            grade_id: gradeId
-        };
+        try {
+            let studentId = student?.id;
 
-        let err;
+            // 1. Upsert Student Profile
+            const studentPayload = {
+                first_name: firstName,
+                last_name: lastName,
+                // generate student number if new? Database handles unique, but trigger might be needed or manual logic.
+                // allowing default or NULL for now.
+            };
 
-        if (student) {
-            // Update
-            const { error } = await supabase.from('students').update(payload).eq('id', student.id);
-            err = error;
-        } else {
-            // Create
-            const { error } = await supabase.from('students').insert([payload]);
-            err = error;
-        }
+            if (student) {
+                const { error } = await supabase.from('students').update(studentPayload).eq('id', student.id);
+                if (error) throw error;
+            } else {
+                const { data, error } = await supabase.from('students').insert([studentPayload]).select().single();
+                if (error) throw error;
+                studentId = data.id;
+            }
 
-        if (err) {
-            alert('Error: ' + err.message);
-        } else {
+            // 2. Manage Enrollment
+            if (studentId && classroomId && gradeId) {
+                // Fetch current academic year - Hardcoded for Phase 1 or fetch active
+                const { data: yearData } = await supabase.from('academic_years').select('id').eq('is_active', true).single();
+
+                if (yearData) {
+                    // Check existing active enrollment
+                    const { data: existing } = await supabase
+                        .from('enrollments')
+                        .select('id')
+                        .eq('student_id', studentId)
+                        .eq('status', 'ACTIVE')
+                        .single();
+
+                    if (existing) {
+                        // Update existing enrollment
+                        await supabase.from('enrollments').update({
+                            classroom_id: classroomId,
+                            grade_id: gradeId
+                        }).eq('id', existing.id);
+                    } else {
+                        // Create new enrollment
+                        await supabase.from('enrollments').insert({
+                            student_id: studentId,
+                            classroom_id: classroomId,
+                            grade_id: gradeId,
+                            academic_year_id: yearData.id,
+                            status: 'ACTIVE'
+                        });
+                    }
+                }
+            }
+
             onSuccess();
             onClose();
+        } catch (err: any) {
+            alert('Error: ' + err.message);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     if (!isOpen) return null;

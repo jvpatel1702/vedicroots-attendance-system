@@ -11,10 +11,13 @@ interface Student {
     first_name: string;
     last_name: string;
     profile_picture?: string;
-    classroom_id: string;
-    grade_id: string;
-    classrooms: { name: string } | null;
-    grades: { name: string } | null;
+    enrollments?: {
+        classrooms: { id: string; name: string } | null;
+        grades: { id: string; name: string } | null;
+        classroom_id: string;
+        grade_id: string;
+        status: string;
+    }[];
 }
 
 export default function StudentsPage() {
@@ -29,14 +32,23 @@ export default function StudentsPage() {
 
     const fetchStudents = useCallback(async () => {
         setLoading(true);
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('students')
             .select(`
                 *,
-                classrooms (name),
-                grades (name)
+                enrollments (
+                    status,
+                    classroom_id,
+                    grade_id,
+                    classrooms (id, name),
+                    grades (id, name)
+                )
             `)
             .order('first_name');
+
+        if (error) {
+            console.error('Error fetching students:', error);
+        }
 
         if (data) setStudents(data as unknown as Student[]);
         setLoading(false);
@@ -106,11 +118,17 @@ export default function StudentsPage() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-sm text-gray-600">
-                                        {student.classrooms?.name || 'Unassigned'}
+                                        {(() => {
+                                            const active = student.enrollments?.find(e => e.status === 'ACTIVE');
+                                            return active?.classrooms?.name || 'Unassigned';
+                                        })()}
                                     </td>
                                     <td className="px-6 py-4 text-sm text-gray-600">
                                         <span className="px-2 py-1 bg-gray-100 rounded text-xs font-medium">
-                                            {student.grades?.name || 'N/A'}
+                                            {(() => {
+                                                const active = student.enrollments?.find(e => e.status === 'ACTIVE');
+                                                return active?.grades?.name || 'N/A';
+                                            })()}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right">
