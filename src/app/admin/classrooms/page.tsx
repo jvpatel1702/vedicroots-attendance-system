@@ -8,13 +8,15 @@ import ClassroomModal from '@/components/admin/ClassroomModal';
 interface ClassroomGrade {
     grades: {
         name: string;
-        type: string;
     } | null;
 }
 
 interface TeacherClassroom {
-    profiles: {
-        name: string;
+    staff: {
+        persons: {
+            first_name: string;
+            last_name: string;
+        } | null;
     } | null;
 }
 
@@ -24,7 +26,7 @@ interface Classroom {
     capacity: number;
     classroom_grades: ClassroomGrade[];
     teacher_classrooms: TeacherClassroom[];
-    students: { count: number }[];
+    enrollments: { count: number }[];
 }
 
 export default function ClassroomsPage() {
@@ -36,18 +38,21 @@ export default function ClassroomsPage() {
 
     const fetchClassrooms = useCallback(async () => {
         setLoading(true);
+
         // Fetch classrooms with relationships
         const { data } = await supabase
             .from('classrooms')
             .select(`
                 *,
                 classroom_grades (
-                    grades (name, type)
+                    grades (name)
                 ),
                 teacher_classrooms (
-                    profiles (name)
+                    staff (
+                        persons (first_name, last_name)
+                    )
                 ),
-                students (count)
+                enrollments (count)
             `)
             .order('name');
 
@@ -129,7 +134,7 @@ export default function ClassroomsPage() {
                                         {cls.teacher_classrooms?.length > 0 ? cls.teacher_classrooms.map((tc, i) => (
                                             <div key={i} className="text-sm text-gray-700 flex items-center gap-2">
                                                 <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                                {tc.profiles?.name}
+                                                {tc.staff?.persons ? `${tc.staff.persons.first_name} ${tc.staff.persons.last_name}` : 'Unknown'}
                                             </div>
                                         )) : (
                                             <p className="text-sm text-gray-400 italic">No teachers assigned</p>
@@ -141,7 +146,7 @@ export default function ClassroomsPage() {
                             <div className="pt-4 mt-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-600">
                                 <div className="flex items-center gap-2">
                                     <Users size={16} />
-                                    <span>{cls.students?.[0]?.count || 0} Students Enrolled</span>
+                                    <span>{cls.enrollments?.[0]?.count || 0} Students Enrolled</span>
                                 </div>
                             </div>
                         </div>

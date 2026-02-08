@@ -31,9 +31,10 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
     const steps = ['Person Info', 'Student Details', 'Guardians', 'Enrollment'];
 
     // Metadata State
+    const [organizations, setOrganizations] = useState<{ id: string, name: string }[]>([]);
+    const [locations, setLocations] = useState<{ id: string, name: string }[]>([]);
     const [classrooms, setClassrooms] = useState<Classroom[]>([]);
     const [grades, setGrades] = useState<Grade[]>([]);
-    const [programs, setPrograms] = useState<Program[]>([]);
 
     // Form Data State
     const [formData, setFormData] = useState({
@@ -41,10 +42,10 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
         firstName: '',
         lastName: '',
         dob: '',
-        photoUrl: '', // Placeholder
+        photoUrl: '',
 
         // Step 2: Student Details
-        studentNumber: '', // Will auto-gen if empty on submit
+        studentNumber: '',
         allergies: '',
         medicalConditions: '',
         medications: '',
@@ -55,8 +56,8 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
         guardians: [] as Guardian[],
 
         // Step 4: Enrollment
-        organizationId: 'aa000000-0000-0000-0000-000000000001', // Default School
-        locationId: 'bb000000-0000-0000-0000-000000000001', // Default Main Campus
+        organizationId: '',
+        locationId: '',
         programId: '',
         gradeId: '',
         classroomId: '',
@@ -78,15 +79,14 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
     });
     const [isAddingGuardian, setIsAddingGuardian] = useState(false);
 
+    // Initial Fetch
     useEffect(() => {
         if (isOpen) {
-            // Fetch metadata
             const fetchMeta = async () => {
-                const { data: cls } = await supabase.from('classrooms').select('*').order('name');
+                const { data: orgs } = await supabase.from('organizations').select('id, name').order('name');
                 const { data: grds } = await supabase.from('grades').select('*').order('order');
-                // Mock programs fetch if table doesn't exist or just hardcode for UI check
 
-                if (cls) setClassrooms(cls);
+                if (orgs) setOrganizations(orgs);
                 if (grds) setGrades(grds);
             };
             fetchMeta();
@@ -94,26 +94,39 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
             // Reset or Prefill
             setCurrentStep(1);
             if (student) {
-                // ... logic to prefill from existing student would go here
-                // maintaining simplified logic for this iteration to focus on "Add New" flow UI
-                updateData('firstName', student.first_name);
-                updateData('lastName', student.last_name);
-                // ... map other fields
-            } else {
+                // Edit Mode: Prefill
+                // Check if data is nested (from recent fetch) or flat (legacy/other sources)
+                const firstName = student.person?.first_name || student.first_name || '';
+                const lastName = student.person?.last_name || student.last_name || '';
+                const photoUrl = student.person?.photo_url || student.photo_url || '';
+
+                updateData('firstName', firstName);
+                updateData('lastName', lastName);
+                updateData('photoUrl', photoUrl);
+                updateData('studentNumber', student.student_number);
+
+                // Map Medical Info
+                // Check if it's in a nested 'medical' object (new fetch) or flat
+                const medical = student.medical || student;
+                updateData('allergies', medical.allergies || '');
+                updateData('medicalConditions', medical.medical_conditions || '');
+                updateData('medications', medical.medications || '');
+                updateData('doctorName', medical.doctor_name || '');
+                updateData('doctorPhone', medical.doctor_phone || '');
                 setFormData({
                     firstName: '',
                     lastName: '',
                     dob: '',
                     photoUrl: '',
-                    studentNumber: `S${Math.floor(Math.random() * 10000)}`, // Mock Auto-gen
+                    studentNumber: `S${Math.floor(Math.random() * 10000)}`,
                     allergies: '',
                     medicalConditions: '',
                     medications: '',
                     doctorName: '',
                     doctorPhone: '',
                     guardians: [],
-                    organizationId: 'aa000000-0000-0000-0000-000000000001',
-                    locationId: 'bb000000-0000-0000-0000-000000000001',
+                    organizationId: '', // User must select
+                    locationId: '',
                     programId: '',
                     gradeId: '',
                     classroomId: '',
@@ -121,7 +134,42 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
                 });
             }
         }
-    }, [isOpen, student]);
+    }, [isOpen, student, supabase]);
+
+    // Fetch Locations when Org Changes
+    useEffect(() => {
+        if (!formData.organizationId) {
+            setLocations([]);
+            return;
+        }
+        const fetchLocations = async () => {
+            const { data } = await supabase.from('locations').select('id, name').eq('organization_id', formData.organizationId).order('name');
+            if (data) setLocations(data);
+        };
+        fetchLocations();
+    }, [formData.organizationId, supabase]);
+
+    // Fetch Classrooms when Location Changes
+    useEffect(() => {
+        if (!formData.locationId) {
+            setClassrooms([]);
+            return;
+        }
+        const fetchClassrooms = async () => {
+            // Fetch all classrooms in the location. 
+            // We removed the strict grade filter to allow flexibility.
+            const { data } = await supabase
+                .from('classrooms')
+                .select('id, name')
+                .eq('location_id', formData.locationId)
+                .order('name');
+
+            if (data) {
+                setClassrooms(data);
+            }
+        };
+        fetchClassrooms();
+    }, [formData.locationId, supabase]);
 
 
     const handleNext = () => {
@@ -172,17 +220,27 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
                 .insert({
                     person_id: personData.id,
                     student_number: formData.studentNumber || `S${Math.floor(Math.random() * 10000)}`,
-                    allergies: formData.allergies,
-                    medical_conditions: formData.medicalConditions,
-                    medications: formData.medications,
-                    doctor_name: formData.doctorName,
-                    doctor_phone: formData.doctorPhone,
-                    tenant_id: formData.organizationId // Assuming tenant_id matches org_id
+                    // Medical info moved to student_medical table
+                    tenant_id: formData.organizationId
                 })
                 .select()
                 .single();
 
             if (studentError) throw studentError;
+
+            // 2b. Create Medical Record
+            const { error: medicalError } = await supabase
+                .from('student_medical')
+                .insert({
+                    student_id: studentData.id,
+                    allergies: formData.allergies,
+                    medical_conditions: formData.medicalConditions,
+                    medications: formData.medications,
+                    doctor_name: formData.doctorName,
+                    doctor_phone: formData.doctorPhone
+                });
+
+            if (medicalError) throw medicalError;
 
             // 3. Process Guardians
             for (const g of formData.guardians) {
@@ -432,38 +490,78 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
 
                             <div className="grid grid-cols-1 gap-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Enrollment Date</label>
-                                    <input type="date" value={formData.enrollmentDate} onChange={e => updateData('enrollmentDate', e.target.value)} className="w-full border p-2 rounded-lg" />
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Organization</label>
+                                    <select
+                                        value={formData.organizationId}
+                                        onChange={e => {
+                                            updateData('organizationId', e.target.value);
+                                            updateData('locationId', ''); // Reset downstream
+                                            updateData('classroomId', '');
+                                        }}
+                                        className="w-full border p-2 rounded-lg bg-white"
+                                    >
+                                        <option value="">Select Organization...</option>
+                                        {organizations.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                                    </select>
                                 </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                                    <select
+                                        value={formData.locationId}
+                                        onChange={e => {
+                                            updateData('locationId', e.target.value);
+                                            updateData('classroomId', ''); // Reset classroom
+                                        }}
+                                        className="w-full border p-2 rounded-lg bg-white"
+                                        disabled={!formData.organizationId}
+                                    >
+                                        <option value="">Select Location...</option>
+                                        {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Enrollment Date</label>
+                                        <input type="date" value={formData.enrollmentDate} onChange={e => updateData('enrollmentDate', e.target.value)} className="w-full border p-2 rounded-lg" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Grade</label>
+                                        <select
+                                            value={formData.gradeId}
+                                            onChange={e => {
+                                                updateData('gradeId', e.target.value);
+                                                updateData('classroomId', ''); // Reset classroom
+                                            }}
+                                            className="w-full border p-2 rounded-lg bg-white"
+                                        >
+                                            <option value="">Select Grade...</option>
+                                            {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Classroom</label>
                                     <select
                                         value={formData.classroomId}
                                         onChange={e => updateData('classroomId', e.target.value)}
                                         className="w-full border p-2 rounded-lg bg-white"
+                                        disabled={!formData.locationId}
                                     >
                                         <option value="">Select Classroom...</option>
                                         {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                     </select>
+                                    {!formData.locationId && <p className="text-xs text-red-400 mt-1">Select Location first</p>}
+                                    {formData.locationId && classrooms.length === 0 && <p className="text-xs text-orange-400 mt-1">No classrooms found at this Location.</p>}
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Grade</label>
-                                    <select
-                                        value={formData.gradeId}
-                                        onChange={e => updateData('gradeId', e.target.value)}
-                                        className="w-full border p-2 rounded-lg bg-white"
-                                    >
-                                        <option value="">Select Grade...</option>
-                                        {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                                    </select>
-                                </div>
-                            </div>
 
-                            <div className="bg-blue-50 p-4 rounded-lg flex gap-3 items-start">
-                                <span className="text-xl">💡</span>
-                                <div className="text-sm text-blue-800">
-                                    <p className="font-bold">Financial Packet Preview</p>
-                                    <p>Based on the selection, the monthly tuition will be calculated automatically. Invoice generation will happen after enrollment.</p>
+                                <div className="bg-blue-50 p-4 rounded-lg flex gap-3 items-start">
+                                    <span className="text-xl">💡</span>
+                                    <div className="text-sm text-blue-800">
+                                        <p className="font-bold">Financial Packet Preview</p>
+                                        <p>Based on the selection, the monthly tuition will be calculated automatically. Invoice generation will happen after enrollment.</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>

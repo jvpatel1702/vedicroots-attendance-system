@@ -1,17 +1,29 @@
-import Link from 'next/link';
+import { createClient } from '@/lib/supabase/server';
+import { redirect } from 'next/navigation';
 
-export default function Home() {
-    return (
-        <main className="flex min-h-screen flex-col items-center justify-center p-24">
-            <h1 className="text-4xl font-bold mb-8">VedicRoots Attendance</h1>
-            <div className="flex gap-4">
-                <Link
-                    href="/login"
-                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                >
-                    Login
-                </Link>
-            </div>
-        </main>
-    );
+export default async function Home() {
+    const supabase = await createClient();
+
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+        // User is authenticated, get their role and redirect to appropriate dashboard
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+        if (profile?.role === 'ADMIN') {
+            redirect('/admin');
+        } else if (profile?.role === 'TEACHER') {
+            redirect('/teacher');
+        } else if (profile?.role === 'OFFICE') {
+            redirect('/office');
+        }
+    }
+
+    // User is not authenticated, redirect to login
+    redirect('/login');
 }

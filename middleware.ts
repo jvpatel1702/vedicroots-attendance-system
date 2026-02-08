@@ -2,8 +2,6 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-    // Dev Bypass check removed
-
     let response = NextResponse.next({
         request: {
             headers: request.headers,
@@ -35,10 +33,51 @@ export async function middleware(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser()
 
-    // Protect routes
-    if (request.nextUrl.pathname.startsWith('/teacher') || request.nextUrl.pathname.startsWith('/admin')) {
+    const pathname = request.nextUrl.pathname
+
+    // Protect all role-specific routes
+    if (pathname.startsWith('/admin') || pathname.startsWith('/teacher') || pathname.startsWith('/office')) {
         if (!user) {
             return NextResponse.redirect(new URL('/login', request.url))
+        }
+
+        // Get user role from database
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        if (!profile) {
+            return NextResponse.redirect(new URL('/login', request.url))
+        }
+
+        // Role-based access control
+        if (pathname.startsWith('/admin') && profile.role !== 'ADMIN') {
+            // Redirect non-admin users to their appropriate dashboard
+            if (profile.role === 'TEACHER') {
+                return NextResponse.redirect(new URL('/teacher', request.url))
+            } else if (profile.role === 'OFFICE') {
+                return NextResponse.redirect(new URL('/office', request.url))
+            }
+        }
+
+        if (pathname.startsWith('/teacher') && profile.role !== 'TEACHER') {
+            // Redirect non-teacher users to their appropriate dashboard
+            if (profile.role === 'ADMIN') {
+                return NextResponse.redirect(new URL('/admin', request.url))
+            } else if (profile.role === 'OFFICE') {
+                return NextResponse.redirect(new URL('/office', request.url))
+            }
+        }
+
+        if (pathname.startsWith('/office') && profile.role !== 'OFFICE') {
+            // Redirect non-office users to their appropriate dashboard
+            if (profile.role === 'ADMIN') {
+                return NextResponse.redirect(new URL('/admin', request.url))
+            } else if (profile.role === 'TEACHER') {
+                return NextResponse.redirect(new URL('/teacher', request.url))
+            }
         }
     }
 
@@ -46,5 +85,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/teacher/:path*', '/admin/:path*'],
+    matcher: ['/admin/:path*', '/teacher/:path*', '/office/:path*'],
 }

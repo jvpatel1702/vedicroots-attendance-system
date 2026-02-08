@@ -6,6 +6,14 @@ export interface StudentVacation {
     end_date: string;   // YYYY-MM-DD
 }
 
+export interface SchoolHoliday {
+    id?: string;
+    organization_id: string;
+    name: string;
+    start_date: string; // YYYY-MM-DD
+    end_date: string;   // YYYY-MM-DD
+}
+
 export function isStudentOnVacation(
     studentId: string,
     vacations: StudentVacation[],
@@ -18,4 +26,17 @@ export function isStudentOnVacation(
         start: parseISO(vacation.start_date),
         end: parseISO(vacation.end_date)
     });
+}
+
+export function isDateHoliday(
+    date: Date,
+    holidays: SchoolHoliday[]
+): SchoolHoliday | null {
+    const holiday = holidays.find(h =>
+        isWithinInterval(date, {
+            start: parseISO(h.start_date),
+            end: parseISO(h.end_date)
+        })
+    );
+    return holiday || null;
 }

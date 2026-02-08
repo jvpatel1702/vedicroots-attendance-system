@@ -61,13 +61,8 @@ export default function SwipeableStudentItem({ student, onMark, isPastCutoff, di
                 onMark(student.id, 'PRESENT');
             }
         } else if (offsetX < -threshold) {
-            // Swiped Left
-            if (isPastCutoff) {
-                // Docs say: "Right or Left Swipe: Marks student as Late"
-                onMark(student.id, 'LATE');
-            } else {
-                onMark(student.id, 'ABSENT');
-            }
+            // Swiped Left - Always marks as ABSENT (before or after cutoff)
+            onMark(student.id, 'ABSENT');
         }
 
         setOffsetX(0);
@@ -87,9 +82,8 @@ export default function SwipeableStudentItem({ student, onMark, isPastCutoff, di
         ? { text: 'LATE', color: 'bg-yellow-500', icon: <Clock /> }
         : { text: 'PRESENT', color: 'bg-green-500', icon: <Check /> };
 
-    const leftIndicator = isPastCutoff
-        ? { text: 'LATE', color: 'bg-yellow-500', icon: <Clock /> }
-        : { text: 'ABSENT', color: 'bg-red-500', icon: <X /> };
+    // Left swipe is always ABSENT (before or after cutoff)
+    const leftIndicator = { text: 'ABSENT', color: 'bg-red-500', icon: <X /> };
 
     return (
         <div className="relative overflow-hidden rounded-xl h-20 select-none touch-pan-y">
@@ -144,7 +138,7 @@ export default function SwipeableStudentItem({ student, onMark, isPastCutoff, di
                 </div>
 
                 <div className="text-gray-300 text-sm">
-                    {isPastCutoff ? '< Slide >' : '< Absent | Present >'}
+                    {isPastCutoff ? '< Absent | Late >' : '< Absent | Present >'}
                 </div>
             </div>
         </div>

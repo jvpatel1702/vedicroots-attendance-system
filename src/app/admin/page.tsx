@@ -2,81 +2,255 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabaseClient';
-import { Users, UserCheck, UserX, Clock, CreditCard, Building2 } from 'lucide-react';
+import { Users, UserCheck, UserX, Clock, CreditCard, Building2, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+import { AbsentStudentsCard, PresentEmployeesCard, NewAdmissionsCard } from '@/components/admin/DashboardWidgets';
+import { useOrganization } from '@/context/OrganizationContext';
 
 export default function AdminDashboard() {
     const supabase = createClient();
+    const { selectedOrganization, isLoading: isOrgLoading } = useOrganization();
+
     const [stats, setStats] = useState({
         totalStudents: 0,
+        totalStaff: 0,
         presentToday: 0,
         absentToday: 0,
         lateToday: 0
     });
 
+    const [todayHoliday, setTodayHoliday] = useState<any>(null);
+
+    // Widget Data States
+    const [absentStudents, setAbsentStudents] = useState<any[]>([]);
+    const [presentEmployees, setPresentEmployees] = useState<any[]>([]);
+    const [admissions, setAdmissions] = useState<any[]>([]);
+
     useEffect(() => {
         async function fetchStats() {
+            if (!selectedOrganization) return;
+
+            const orgId = selectedOrganization.id;
             const today = new Date().toISOString().split('T')[0];
+            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
 
-            // 1. Total Active Students (via Enrollments)
-            // If enrollments table is empty (seed might need check), fallback to students count for now
-            const { count: enrollmentCount } = await supabase
+            // 1. Total Active Students in Organization
+            // Filter: Enrollments -> Classrooms -> Locations -> Org
+            const { count: enrollmentCount, error: enrollError } = await supabase
                 .from('enrollments')
-                .select('*', { count: 'exact', head: true })
-                .eq('status', 'ACTIVE');
+                .select('id, classrooms!inner(locations!inner(organization_id))', { count: 'exact', head: true })
+                .eq('status', 'ACTIVE')
+                .eq('classrooms.locations.organization_id', orgId);
 
-            // Fallback if enrollments is 0 (during transition)
-            const { count: studentCount } = await supabase
-                .from('students')
-                .select('*', { count: 'exact', head: true });
+            if (enrollError) console.error("Error fetching students:", enrollError);
 
             // 2. Attendance Stats
-            const { data: attendance } = await supabase
+            // Fetch all attendance for today, then filter by Org via Student Enrollments
+            // Note: Deep filtering in one go is better if possible.
+            // We need students who belong to this Org.
+            const { data: attendance, error: attError } = await supabase
                 .from('attendance')
-                .select('status')
-                .eq('date', today);
+                .select(`
+                    status, 
+                    arrival_time, 
+                    students!inner(
+                        first_name, 
+                        last_name, 
+                        enrollments!inner(
+                            classrooms!inner(
+                                locations!inner(organization_id)
+                            )
+                        )
+                    )
+                `)
+                .eq('date', today)
+                .eq('students.enrollments.status', 'ACTIVE') // Only active enrollments
+                .eq('students.enrollments.classrooms.locations.organization_id', orgId);
 
-            const present = attendance?.filter(a => a.status === 'PRESENT').length || 0;
-            const absent = attendance?.filter(a => a.status === 'ABSENT').length || 0;
-            const late = attendance?.filter(a => a.status === 'LATE').length || 0;
+            if (attError) console.error("Error fetching attendance:", attError);
+
+            const present = attendance?.filter((a: any) => a.status === 'PRESENT').length || 0;
+            const absent = attendance?.filter((a: any) => a.status === 'ABSENT').length || 0;
+            const late = attendance?.filter((a: any) => a.status === 'LATE').length || 0;
+
+            const absentOnly = attendance?.filter((a: any) => a.status === 'ABSENT').map((a: any) => ({
+                id: Math.random().toString(),
+                name: a.students ? `${a.students.first_name} ${a.students.last_name}` : 'Unknown'
+            })) || [];
+
+            setAbsentStudents(absentOnly);
+
+            // 3. Staff Stats & Attendance
+            // Staff linked via persons -> organization_id
+            const { count: staffCount, error: staffError } = await supabase
+                .from('staff')
+                .select('id, persons!inner(organization_id)', { count: 'exact', head: true })
+                .eq('persons.organization_id', orgId);
+
+            if (staffError) console.error("Error fetching staff:", staffError);
+
+            // Present Employees
+            const { data: staffAttendance, error: staffAttError } = await supabase
+                .from('staff_attendance')
+                .select(`
+                    status, 
+                    check_in, 
+                    staff!inner(
+                        role,
+                        persons!inner(
+                            first_name, 
+                            last_name,
+                            organization_id
+                        )
+                    )
+                `)
+                .eq('date', today)
+                .eq('status', 'PRESENT')
+                .eq('staff.persons.organization_id', orgId);
+
+            if (staffAttError) console.error("Error fetching staff attendance:", staffAttError);
+
+            if (staffAttendance) {
+                // Filter duplicates if a teacher has multiple classrooms in same org
+                const uniqueEmployees = new Map();
+                staffAttendance.forEach((sa: any) => {
+                    const name = sa.staff?.persons ? `${sa.staff.persons.first_name} ${sa.staff.persons.last_name}` : 'Unknown';
+                    if (!uniqueEmployees.has(name)) {
+                        uniqueEmployees.set(name, {
+                            id: Math.random().toString(),
+                            name: name,
+                            role: sa.staff?.role || 'Staff',
+                            checkInTime: sa.check_in
+                        });
+                    }
+                });
+                setPresentEmployees(Array.from(uniqueEmployees.values()));
+            }
+
+            // 4. Enrollments (Admissions)
+            const { data: enrollmentData, error: admError } = await supabase
+                .from('enrollments')
+                .select(`
+                    enrollment_date, 
+                    end_date, 
+                    students(first_name, last_name),
+                    classrooms!inner(
+                        locations!inner(organization_id)
+                    )
+                `)
+                .eq('classrooms.locations.organization_id', orgId)
+                .or(`enrollment_date.gte.${startOfMonth},end_date.gte.${startOfMonth}`);
+
+            if (admError) console.error("Error fetching admissions:", admError);
+
+            const admissionList: any[] = [];
+            if (enrollmentData) {
+                enrollmentData.forEach((e: any) => {
+                    const eDate = new Date(e.enrollment_date);
+                    const endDate = e.end_date ? new Date(e.end_date) : null;
+                    const now = new Date();
+                    const currentMonth = now.getMonth();
+                    const nextMonth = (currentMonth + 1) % 12;
+
+                    // Joining This Month
+                    if (eDate.getMonth() === currentMonth && eDate.getFullYear() === now.getFullYear()) {
+                        admissionList.push({
+                            id: Math.random().toString(),
+                            name: `${e.students.first_name} ${e.students.last_name}`,
+                            date: e.enrollment_date,
+                            type: 'JOINING'
+                        });
+                    }
+                    // Joining Next Month
+                    else if (eDate.getMonth() === nextMonth) {
+                        admissionList.push({
+                            id: Math.random().toString(),
+                            name: `${e.students.first_name} ${e.students.last_name}`,
+                            date: e.enrollment_date,
+                            type: 'UPCOMING'
+                        });
+                    }
+
+                    // Finishing This Month
+                    if (endDate && endDate.getMonth() === currentMonth && endDate.getFullYear() === now.getFullYear()) {
+                        admissionList.push({
+                            id: Math.random().toString(),
+                            name: `${e.students.first_name} ${e.students.last_name}`,
+                            date: e.end_date,
+                            type: 'FINISHING'
+                        });
+                    }
+                });
+            }
+            setAdmissions(admissionList);
 
             setStats({
-                totalStudents: (enrollmentCount || studentCount) || 0,
+                totalStudents: enrollmentCount || 0,
+                totalStaff: staffCount || 0,
                 presentToday: present,
                 absentToday: absent,
                 lateToday: late
             });
+
+            // Fetch Holiday
+            const { data: holidayData } = await supabase
+                .from('school_holidays')
+                .select('*')
+                .lte('start_date', today)
+                .gte('end_date', today)
+                .eq('organization_id', orgId)
+                .limit(1);
+
+            if (holidayData && holidayData.length > 0) {
+                setTodayHoliday(holidayData[0]);
+            } else {
+                setTodayHoliday(null);
+            }
         }
 
         fetchStats();
-    }, [supabase]);
+    }, [supabase, selectedOrganization]);
+
+
+
+    if (isOrgLoading) {
+        return <div className="p-8">Loading Organization Context...</div>;
+    }
 
     return (
         <div className="space-y-8 p-8 bg-gray-50/50 min-h-screen">
             <div className="flex justify-between items-center">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight text-brand-dark">Dashboard Overview</h2>
-                    <p className="text-muted-foreground mt-2">Welcome to Vedic Roots Administration.</p>
-                </div>
-                <div className="flex gap-4">
-                    <Select defaultValue="all">
-                        <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Select Location" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Locations</SelectItem>
-                            <SelectItem value="main">Main Campus</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <p className="text-muted-foreground mt-2">
+                        Welcome to {selectedOrganization?.name || 'Vedic Roots Administration'}.
+                    </p>
                 </div>
             </div>
+
+            {todayHoliday && (
+                <div className="bg-brand-cream border border-brand-gold/30 p-4 rounded-xl flex items-center gap-4 text-brand-olive shadow-sm">
+                    <div className="p-2 bg-white rounded-lg shadow-sm">
+                        <Calendar className="h-5 w-5" />
+                    </div>
+                    <div>
+                        <p className="font-bold">Today is a School Holiday: {todayHoliday.name}</p>
+                        <p className="text-sm opacity-80">Regular and elective attendance marking is disabled for today.</p>
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <DashboardCard
                     title="Total Students"
                     value={stats.totalStudents}
                     icon={<Users className="h-4 w-4 text-brand-sky" />}
+                />
+                <DashboardCard
+                    title="Total Staff"
+                    value={stats.totalStaff}
+                    icon={<UserCheck className="h-4 w-4 text-brand-olive" />}
                 />
                 <DashboardCard
                     title="Present Today"
@@ -88,14 +262,17 @@ export default function AdminDashboard() {
                     value={stats.absentToday}
                     icon={<UserX className="h-4 w-4 text-destructive" />}
                 />
-                <DashboardCard
-                    title="Late Arrivals"
-                    value={stats.lateToday}
-                    icon={<Clock className="h-4 w-4 text-brand-gold" />}
-                />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* New Widgets Section - Side by Side */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <AbsentStudentsCard students={absentStudents} />
+                <PresentEmployeesCard employees={presentEmployees} />
+                <NewAdmissionsCard admissions={admissions} />
+            </div>
+
+            {/* Enrollment Chart - Full Width */}
+            <div className="w-full">
                 <Card>
                     <CardHeader>
                         <CardTitle>Enrollment by Program</CardTitle>
@@ -106,18 +283,8 @@ export default function AdminDashboard() {
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Recent Activity</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-muted-foreground text-sm text-center py-8">
-                            No recent activity logs available.
-                        </div>
-                    </CardContent>
-                </Card>
             </div>
-        </div>
+        </div >
     );
 }
 

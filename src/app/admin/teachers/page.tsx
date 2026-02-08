@@ -25,20 +25,28 @@ export default function TeachersPage() {
 
     const fetchTeachers = useCallback(async () => {
         setLoading(true);
-        // Fetch profiles with role teacher AND their assigned classrooms
-        const { data: profiles } = await supabase
-            .from('profiles')
+        // Fetch staff with role teacher AND their assigned classrooms
+        const { data: staffList } = await supabase
+            .from('staff')
             .select(`
-                *,
+                id,
+                email,
+                role,
+                persons (first_name, last_name),
                 teacher_classrooms (
                     classrooms (name)
                 )
             `)
-            .eq('role', 'TEACHER')
-            .order('name');
+            .eq('role', 'TEACHER');
 
-        if (profiles) {
-            setTeachers(profiles as unknown as TeacherProfile[]);
+        if (staffList) {
+            const mappedTeachers: TeacherProfile[] = staffList.map((s: any) => ({
+                id: s.id,
+                name: s.persons ? `${s.persons.first_name} ${s.persons.last_name}` : 'Unknown',
+                email: s.email || '',
+                teacher_classrooms: s.teacher_classrooms
+            }));
+            setTeachers(mappedTeachers);
         }
         setLoading(false);
     }, [supabase]);

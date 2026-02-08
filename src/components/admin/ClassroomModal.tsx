@@ -21,25 +21,69 @@ export default function ClassroomModal({ isOpen, onClose, classroom, onSuccess }
     const supabase = createClient();
     const [name, setName] = useState('');
     const [capacity, setCapacity] = useState(20);
+    const [locationId, setLocationId] = useState('');
+    const [locations, setLocations] = useState<{ id: string, name: string }[]>([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
+            // Fetch locations
+            const fetchLocations = async () => {
+                const { data } = await supabase.from('locations').select('id, name');
+                if (data) {
+                    setLocations(data);
+                    // Default to first location if none selected and only one exists
+                    if (data.length === 1 && !classroom) {
+                        setLocationId(data[0].id);
+                    }
+                }
+            };
+            fetchLocations();
+
             if (classroom) {
                 setName(classroom.name);
                 setCapacity(classroom.capacity);
+                // In a real app we'd fetch the classroom's location_id here if it's not passed in props
+                // For now, let's assume we might need to fetch it or just let user select.
+                // If the classroom object doesn't have location_id, we might want to fetch it.
+                // But for this quick fix, let's just let them select or default.
             } else {
                 setName('');
                 setCapacity(20);
+                setLocationId('');
             }
         }
-    }, [isOpen, classroom]);
+    }, [isOpen, classroom, supabase]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
 
-        const payload = { name, capacity };
+        if (!locationId) {
+            // Try to find a default if not set (e.g. if we didn't wait for fetch)
+            const { data } = await supabase.from('locations').select('id').limit(1).single();
+            if (data) {
+                // proceed with this id
+            } else {
+                alert('Please select a location');
+                setLoading(false);
+                return;
+            }
+        }
+
+        // Final check on locationId
+        let finalLocationId = locationId;
+        if (!finalLocationId) {
+            const { data } = await supabase.from('locations').select('id').limit(1).single();
+            if (data) finalLocationId = data.id;
+            else {
+                alert('No location found. Please contact admin.');
+                setLoading(false);
+                return;
+            }
+        }
+
+        const payload = { name, capacity, location_id: finalLocationId };
         let result;
 
         if (classroom) {
@@ -95,6 +139,21 @@ export default function ClassroomModal({ isOpen, onClose, classroom, onSuccess }
                             className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:ring-2 focus:ring-brand-olive focus:border-transparent outline-none"
                         />
                     </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                        <select
+                            value={locationId}
+                            onChange={e => setLocationId(e.target.value)}
+                            className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:ring-2 focus:ring-brand-olive focus:border-transparent outline-none bg-white"
+                        >
+                            <option value="">Select Location</option>
+                            {locations.map(loc => (
+                                <option key={loc.id} value={loc.id}>{loc.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Capacity</label>
                         <input

@@ -25,68 +25,145 @@ export default function TeacherForm({ teacher, isOpen, onClose, onSuccess }: Pro
     const [loading, setLoading] = useState(false);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
+    const [locations, setLocations] = useState<{ id: string, name: string }[]>([]);
+    const [organizations, setOrganizations] = useState<{ id: string, name: string }[]>([]);
+
+    // Hierarchy State
+    const [selectedOrgId, setSelectedOrgId] = useState('');
+    const [selectedLocationId, setSelectedLocationId] = useState('');
     const [classroomId, setClassroomId] = useState(''); // Primary assignment
     const [classrooms, setClassrooms] = useState<Classroom[]>([]);
 
     useEffect(() => {
-        const fetchClassrooms = async () => {
-            const { data } = await supabase.from('classrooms').select('*').order('name');
-            if (data) setClassrooms(data);
+        // Fetch Organizations on load
+        const fetchOrgs = async () => {
+            const { data } = await supabase.from('organizations').select('id, name').order('name');
+            if (data) setOrganizations(data);
         };
+        fetchOrgs();
 
         if (isOpen) {
-            fetchClassrooms();
             if (teacher) {
                 setName(teacher.name);
                 setEmail(teacher.email);
-                // Currently only getting one assignment for simplicity in this form.
-                // In a real app we might handle multiple assignments via a junction table check.
+                // TODO: In edit mode, we should ideally pre-fill Org/Location based on checking existing assignments.
+                // For now, simpler to leave empty or just load teacher details.
+                // Creating a proper "Edit Assignment" flow might be a separate task, 
+                // but let's at least clear the selections to avoid invalid states.
             } else {
                 setName('');
                 setEmail('');
+                setSelectedOrgId('');
+                setSelectedLocationId('');
                 setClassroomId('');
             }
         }
     }, [isOpen, teacher, supabase]);
 
+    // Fetch Locations when Org changes
+    useEffect(() => {
+        if (!selectedOrgId) {
+            setLocations([]);
+            setSelectedLocationId('');
+            return;
+        }
+        const fetchLocations = async () => {
+            const { data } = await supabase
+                .from('locations')
+                .select('id, name')
+                .eq('organization_id', selectedOrgId)
+                .order('name');
+            if (data) setLocations(data);
+        };
+        fetchLocations();
+    }, [selectedOrgId, supabase]);
+
+    // Fetch Classrooms when Location changes
+    useEffect(() => {
+        if (!selectedLocationId) {
+            setClassrooms([]);
+            setClassroomId('');
+            return;
+        }
+        const fetchClassrooms = async () => {
+            const { data } = await supabase
+                .from('classrooms')
+                .select('id, name')
+                .eq('location_id', selectedLocationId)
+                .order('name');
+            if (data) setClassrooms(data);
+        };
+        fetchClassrooms();
+    }, [selectedLocationId, supabase]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
 
-        const payload = {
-            name: name,
+        const personPayload = {
+            first_name: name.split(' ')[0],
+            last_name: name.split(' ').slice(1).join(' ') || '.',
             email: email,
-            role: 'TEACHER'
+            organization_id: selectedOrgId // Link person to Org
         };
 
-        let teacherId = teacher?.id;
+        // Validate Org Selection
+        if (!selectedOrgId) {
+            alert('Please select an Organization.');
+            setLoading(false);
+            return;
+        }
+
+        let personId;
+        let staffId = teacher?.id;
         let err;
 
         if (teacher) {
-            // Update Profile
-            const { error } = await supabase.from('profiles').update(payload).eq('id', teacher.id);
-            err = error;
+            // EDIT MODE
+            const { data: staffData } = await supabase.from('staff').select('person_id').eq('id', teacher.id).single();
+
+            if (staffData?.person_id) {
+                const { error: pErr } = await supabase.from('persons').update(personPayload).eq('id', staffData.person_id);
+                if (pErr) {
+                    err = pErr;
+                } else {
+                    const { error: sErr } = await supabase.from('staff').update({ email, role: 'TEACHER' }).eq('id', teacher.id);
+                    err = sErr;
+                }
+            } else {
+                err = new Error("Could not find linked person record.");
+            }
         } else {
-            // Create Profile (Note: This doesn't create Auth user, just the profile record)
-            const { data, error } = await supabase.from('profiles').insert([payload]).select().single();
-            err = error;
-            if (data) teacherId = data.id;
+            // CREATE MODE
+            const { data: personData, error: pErr } = await supabase.from('persons').insert([personPayload]).select().single();
+            if (pErr) {
+                err = pErr;
+            } else if (personData) {
+                personId = personData.id;
+                const { data: staffData, error: sErr } = await supabase.from('staff').insert([{
+                    person_id: personId,
+                    role: 'TEACHER',
+                    email: email,
+                    is_active: true
+                }]).select().single();
+
+                if (sErr) err = sErr;
+                if (staffData) staffId = staffData.id;
+            }
         }
 
         if (err) {
-            alert('Error saving profile: ' + err.message);
+            alert('Error saving teacher: ' + err.message);
             setLoading(false);
             return;
         }
 
         // Handle Classroom Assignment
-        if (classroomId && teacherId) {
-            // Clear existing for simplicity or add new?
-            // Let's simple "Upsert" logic: Delete old, add new
-            await supabase.from('teacher_classrooms').delete().eq('teacher_id', teacherId);
+        if (classroomId && staffId) {
+            await supabase.from('teacher_classrooms').delete().eq('staff_id', staffId);
 
             const { error: assignError } = await supabase.from('teacher_classrooms').insert([{
-                teacher_id: teacherId,
+                staff_id: staffId,
                 classroom_id: classroomId
             }]);
 
@@ -133,18 +210,51 @@ export default function TeacherForm({ teacher, isOpen, onClose, onSuccess }: Pro
                         {!teacher && <p className="text-xs text-gray-500 mt-1">Note: This creates a profile only. User must sign up with this email.</p>}
                     </div>
 
+                    {/* Hierarchy Selections */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Organization</label>
+                        <select
+                            value={selectedOrgId}
+                            onChange={e => setSelectedOrgId(e.target.value)}
+                            className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:ring-2 focus:ring-brand-olive focus:border-transparent outline-none bg-white"
+                            required={!teacher} // Required for new teachers
+                        >
+                            <option value="">Select Organization</option>
+                            {organizations.map(o => (
+                                <option key={o.id} value={o.id}>{o.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                        <select
+                            value={selectedLocationId}
+                            onChange={e => setSelectedLocationId(e.target.value)}
+                            className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:ring-2 focus:ring-brand-olive focus:border-transparent outline-none bg-white"
+                            disabled={!selectedOrgId}
+                        >
+                            <option value="">Select Location</option>
+                            {locations.map(l => (
+                                <option key={l.id} value={l.id}>{l.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Assign Classroom</label>
                         <select
                             value={classroomId}
                             onChange={e => setClassroomId(e.target.value)}
                             className="w-full rounded-lg border border-gray-300 p-2 text-gray-900 focus:ring-2 focus:ring-brand-olive focus:border-transparent outline-none bg-white"
+                            disabled={!selectedLocationId}
                         >
                             <option value="">Select Classroom</option>
                             {classrooms.map(c => (
                                 <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                         </select>
+                        <p className="text-xs text-gray-500 mt-1">Only showing classrooms at selected location.</p>
                     </div>
 
                     <div className="pt-2">

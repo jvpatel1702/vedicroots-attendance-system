@@ -2,11 +2,11 @@
 
 import { useEffect, useState, use, useCallback } from 'react';
 import { createClient } from '@/lib/supabaseClient';
-import { Save, Info, Loader2 } from 'lucide-react';
+import { Save, Info, Loader2, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@/lib/useUser';
 import { isPastCutoff, GradeType, SchoolSettings } from '@/lib/attendanceTime';
-import { isStudentOnVacation, StudentVacation } from '@/lib/classroomUtils';
+import { isStudentOnVacation, StudentVacation, SchoolHoliday } from '@/lib/classroomUtils';
 import SwipeableStudentItem from '@/components/SwipeableStudentItem';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -35,6 +35,7 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
     const [settings, setSettings] = useState<SchoolSettings | null>(null);
     const [gradeType, setGradeType] = useState<GradeType>('ELEMENTARY'); // Default
     const [isPastCutoffState, setIsPastCutoffState] = useState(false);
+    const [todayHoliday, setTodayHoliday] = useState<SchoolHoliday | null>(null);
     // Use local date string (YYYY-MM-DD) to avoid timezone issues with toISOString()
     const [date] = useState(() => new Date().toLocaleDateString('en-CA'));
 
@@ -59,10 +60,21 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                 const { data: settingsData } = await supabase.from('school_settings').select('*').single();
                 if (settingsData) {
                     currentSettings = {
-                        // In Seed, cutoff_time is 09:00. Adapting for simple logic:
-                        cutoff_time_kg: '09:15:00', // Hardcoded default for now
-                        cutoff_time_elementary: settingsData.cutoff_time || '09:00:00'
+                        // Use new separate columns, with fallback to old cutoff_time for backwards compatibility
+                        cutoff_time_kg: settingsData.cutoff_time_kg || settingsData.cutoff_time || '09:15:00',
+                        cutoff_time_elementary: settingsData.cutoff_time_elementary || settingsData.cutoff_time || '09:00:00'
                     };
+                }
+
+                // Fetch Today's Holiday
+                const { data: holidayData } = await supabase
+                    .from('school_holidays')
+                    .select('*')
+                    .lte('start_date', date)
+                    .gte('end_date', date);
+
+                if (holidayData && holidayData.length > 0) {
+                    setTodayHoliday(holidayData[0] as SchoolHoliday);
                 }
             }
             setSettings(currentSettings);
@@ -246,16 +258,26 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                 </div>
 
                 {/* Status Bar */}
-                <Alert className={`${isPastCutoffState ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>{isPastCutoffState ? 'Cutoff Passed' : 'Window Open'}</AlertTitle>
-                    <AlertDescription>
-                        {isPastCutoffState
-                            ? `Only "LATE" marking allowed.`
-                            : `Drop-off window open until ${gradeType === 'KINDERGARTEN' ? settings?.cutoff_time_kg : settings?.cutoff_time_elementary}.`
-                        }
-                    </AlertDescription>
-                </Alert>
+                {todayHoliday ? (
+                    <Alert className="bg-brand-cream text-brand-olive border-brand-gold/30 shadow-sm">
+                        <Calendar className="h-4 w-4" />
+                        <AlertTitle>School Holiday: {todayHoliday.name}</AlertTitle>
+                        <AlertDescription>
+                            Attendance marking is disabled for today. Enjoy the break!
+                        </AlertDescription>
+                    </Alert>
+                ) : (
+                    <Alert className={`${isPastCutoffState ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                        <Info className="h-4 w-4" />
+                        <AlertTitle>{isPastCutoffState ? 'Cutoff Passed' : 'Window Open'}</AlertTitle>
+                        <AlertDescription>
+                            {isPastCutoffState
+                                ? `Only "LATE" or "ABSENT" marking allowed.`
+                                : `Drop-off window open until ${gradeType === 'KINDERGARTEN' ? settings?.cutoff_time_kg : settings?.cutoff_time_elementary}.`
+                            }
+                        </AlertDescription>
+                    </Alert>
+                )}
             </div>
 
             <div className="space-y-4">
@@ -279,7 +301,7 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                 <div className="max-w-lg mx-auto">
                     <Button
                         onClick={saveAttendance}
-                        disabled={saving || !hasAnyMarked}
+                        disabled={saving || !hasAnyMarked || !!todayHoliday}
                         className="w-full h-14 text-lg font-bold shadow-lg"
                         size="lg"
                     >
