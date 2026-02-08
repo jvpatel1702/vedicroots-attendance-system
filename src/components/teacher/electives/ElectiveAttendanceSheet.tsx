@@ -1,4 +1,5 @@
 'use client'
+import { useState, useEffect } from 'react'
 
 import { getElectiveAttendanceSheet, markElectiveAttendance } from '@/app/actions/electives'
 import { createClient } from '@/lib/supabaseClient'
@@ -104,7 +105,7 @@ export default function ElectiveAttendanceSheet({ offeringId, offeringName, date
                     <h2 className="font-semibold text-gray-900">Class Attendance</h2>
                     <p className="text-sm text-muted-foreground">{date}</p>
                 </div>
-                
+
                 {todayHoliday ? (
                     <div className="bg-brand-cream border border-brand-gold/30 px-4 py-2 rounded-lg flex items-center gap-3 text-brand-olive text-sm font-medium">
                         <span className="h-2 w-2 bg-brand-olive rounded-full animate-pulse" />
@@ -122,8 +123,8 @@ export default function ElectiveAttendanceSheet({ offeringId, offeringName, date
                             />
                             <label htmlFor="teacherAbsent" className="font-medium text-sm cursor-pointer text-gray-700">Generic: Teacher Absent</label>
                         </div>
-                        <Button 
-                            onClick={handleSave} 
+                        <Button
+                            onClick={handleSave}
                             disabled={saving}
                             className="bg-brand-olive hover:bg-brand-olive/90"
                         >

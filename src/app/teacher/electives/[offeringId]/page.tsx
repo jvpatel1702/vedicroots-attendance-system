@@ -2,7 +2,7 @@ import ElectiveAttendanceSheet from '@/components/teacher/electives/ElectiveAtte
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
-export default async function ElectiveClassPage({ params, searchParams }: { params: { offeringId: string }, searchParams: { date?: string } }) {
+export default async function ElectiveClassPage({ params, searchParams }: { params: Promise<{ offeringId: string }>, searchParams: Promise<{ date?: string }> }) {
     const { offeringId } = await params
     const date = (await searchParams).date || new Date().toISOString().split('T')[0]
 

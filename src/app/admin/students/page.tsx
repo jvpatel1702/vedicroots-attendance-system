@@ -105,7 +105,8 @@ export default function StudentsPage() {
         }
 
         if (data) {
-            const validStudents = (data as unknown as Student[]).filter(student => student.person);
+            // Filter out any students that don't have a linked person record
+            const validStudents = (data as any[]).filter(s => s.person).map(s => s as Student);
             setStudents(validStudents);
         }
         setLoading(false);

@@ -70,7 +70,7 @@ export default function ExtendedCareModal({ isOpen, onClose, onSuccess }: Props)
                     .limit(10);
 
                 if (data) {
-                    const mapped = data.map((s: any) => ({
+                    const mapped = (data as any[]).filter(s => s.person).map((s: any) => ({
                         id: s.id,
                         first_name: s.person.first_name,
                         last_name: s.person.last_name,

@@ -219,10 +219,149 @@ export async function enrollStudentInElective(studentId: string, offeringId: str
 
 // --- Attendance ---
 
+export async function getTeacherElectiveOfferings(teacherId: string) {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('elective_offerings')
+        .select(`
+            *,
+            subject:elective_subjects(name)
+        `)
+        .eq('teacher_id', teacherId)
+        .order('schedule_day')
+
+    if (error) throw new Error(error.message)
+    return data
+}
+
+export async function getElectiveAttendanceSheet(offeringId: string, date: string) {
+    const supabase = await createClient()
+
+    // 1. Get Class session for this offering and date
+    const { data: classSession, error: classError } = await supabase
+        .from('elective_classes')
+        .select('*')
+        .eq('offering_id', offeringId)
+        .eq('date', date)
+        .single()
+
+    // If no session exists, it might be a holiday or unscheduled
+    if (classError || !classSession) {
+        // Return empty or throw? Component seems to expect data
+        // Let's check if we should return something even if session doesn't exist?
+        // Actually, the teacher sheet works by date.
+        return []
+    }
+
+    // 2. Get Enrollments valid for this date
+    const { data: enrollments, error: enrollmentError } = await supabase
+        .from('elective_enrollments')
+        .select(`
+            id,
+            student:students(id, first_name, last_name)
+        `)
+        .eq('offering_id', offeringId)
+        .lte('start_date', date)
+        .or(`end_date.is.null,end_date.gte.${date}`)
+        .eq('status', 'ACTIVE')
+
+    if (enrollmentError) throw new Error(enrollmentError.message)
+
+    // 3. Get Existing Attendance Marks
+    const { data: attendance, error: attendanceError } = await supabase
+        .from('elective_attendance')
+        .select('*')
+        .eq('class_id', classSession.id)
+
+    if (attendanceError) throw new Error(attendanceError.message)
+
+    // 4. Get general school attendance for these students to show "Absent in School"
+    const studentIds = enrollments.map(e => (e.student as any).id)
+    const { data: schoolAttendance } = await supabase
+        .from('attendance')
+        .select('student_id, status')
+        .in('student_id', studentIds)
+        .eq('date', date)
+
+    // 5. Merge
+    return enrollments.map(enrollment => {
+        const record = attendance?.find(a => a.student_id === (enrollment.student as any).id)
+        const schoolRecord = schoolAttendance?.find(a => a.student_id === (enrollment.student as any).id)
+
+        return {
+            student: enrollment.student,
+            enrollment_id: enrollment.id,
+            status: record?.status || 'UNMARKED',
+            remarks: record?.remarks || '',
+            is_rollover: record?.is_rollover || false,
+            rollover_note: record?.rollover_note || '',
+            school_status: schoolRecord?.status || 'PRESENT', // Assume present if no record
+            class_id: classSession.id
+        }
+    })
+}
+
+export async function markElectiveAttendance(payload: {
+    enrollment_id: string,
+    date: string,
+    status: string,
+    is_rollover?: boolean,
+    rollover_note?: string
+}[]) {
+    const supabase = await createClient()
+
+    // We need to map enrollment_id + date back to class_id + student_id
+    // But payload usually comes from the sheet which knows the class_id and student_id?
+    // Looking at ElectiveAttendanceSheet.tsx:
+    // payload = students.map(s => ({ enrollment_id: s.enrollment_id, date: date, status: s.status, is_rollover: s.is_rollover, rollover_note: s.rollover_note }))
+
+    // Let's resolve class_id first
+    if (payload.length === 0) return
+
+    // All should be for the same date and same offering (implied by sheet)
+    // We need student_id and class_id
+
+    for (const item of payload) {
+        // Resolve student_id from enrollment_id
+        const { data: enrollment } = await supabase
+            .from('elective_enrollments')
+            .select('student_id, offering_id')
+            .eq('id', item.enrollment_id)
+            .single()
+
+        if (!enrollment) continue
+
+        // Resolve class_id from offering_id + date
+        const { data: classSession } = await supabase
+            .from('elective_classes')
+            .select('id')
+            .eq('offering_id', enrollment.offering_id)
+            .eq('date', item.date)
+            .single()
+
+        if (!classSession) continue
+
+        const upsertData = {
+            class_id: classSession.id,
+            student_id: enrollment.student_id,
+            status: item.status,
+            is_rollover: item.is_rollover,
+            rollover_note: item.rollover_note
+        }
+
+        const { error } = await supabase
+            .from('elective_attendance')
+            .upsert(upsertData, { onConflict: 'class_id, student_id' })
+
+        if (error) throw new Error(error.message)
+    }
+
+    revalidatePath('/teacher/electives')
+}
+
 export async function getElectiveClassAttendance(classId: string) {
     const supabase = await createClient()
 
-    // 1. Get Class Details
     const { data: classSession, error: classError } = await supabase
         .from('elective_classes')
         .select('*, offering:elective_offerings(id)')
@@ -231,8 +370,6 @@ export async function getElectiveClassAttendance(classId: string) {
 
     if (classError) throw new Error(classError.message)
 
-    // 2. Get Enrollments valid for this date
-    // Only active enrollments that started BEFORE this class date and haven't ended (or ended AFTER)
     const { data: enrollments, error: enrollmentError } = await supabase
         .from('elective_enrollments')
         .select(`
@@ -242,11 +379,10 @@ export async function getElectiveClassAttendance(classId: string) {
         .eq('offering_id', classSession.offering.id)
         .lte('start_date', classSession.date)
         .or(`end_date.is.null,end_date.gte.${classSession.date}`)
-        .eq('status', 'ACTIVE') // or DROPPED if we want to show history, but let's stick to ACTIVE for roll call
+        .eq('status', 'ACTIVE')
 
     if (enrollmentError) throw new Error(enrollmentError.message)
 
-    // 3. Get Existing Attendance Marks
     const { data: attendance, error: attendanceError } = await supabase
         .from('elective_attendance')
         .select('*')
@@ -254,14 +390,15 @@ export async function getElectiveClassAttendance(classId: string) {
 
     if (attendanceError) throw new Error(attendanceError.message)
 
-    // 4. Merge
     return enrollments.map(enrollment => {
         const record = attendance?.find(a => a.student_id === (enrollment.student as any).id)
         return {
             student: enrollment.student,
             enrollment_id: enrollment.id,
-            status: record?.status || 'UNMARKED', // UI treat as Present by default? or Unmarked
+            status: record?.status || 'UNMARKED',
             remarks: record?.remarks || '',
+            is_rollover: record?.is_rollover || false,
+            rollover_note: record?.rollover_note || '',
             attendance_id: record?.id
         }
     })
@@ -271,15 +408,15 @@ export async function markElectiveClassAttendance(payload: {
     class_id: string,
     student_id: string,
     status: string,
-    remarks?: string
+    remarks?: string,
+    is_rollover?: boolean,
+    rollover_note?: string
 }[]) {
     const supabase = await createClient()
 
-    // Upsert logic
     const { error } = await supabase
         .from('elective_attendance')
         .upsert(payload, { onConflict: 'class_id, student_id' })
 
     if (error) throw new Error(error.message)
 }
-

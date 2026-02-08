@@ -143,8 +143,8 @@ export default function AddEnrollmentModal({ isOpen, onClose, onSuccess, academi
 
                 const enrolledSet = new Set(existingEnrollments?.map(e => e.student_id));
 
-                const available = data
-                    .filter(s => !enrolledSet.has(s.id))
+                const available = (data as any[])
+                    .filter(s => s.person && !enrolledSet.has(s.id))
                     .map(s => ({
                         id: s.id,
                         first_name: s.person.first_name,
@@ -188,8 +188,8 @@ export default function AddEnrollmentModal({ isOpen, onClose, onSuccess, academi
 
             const enrolledSet = new Set(enrolled?.map(e => e.student_id));
 
-            const available = allStudents
-                .filter(s => !enrolledSet.has(s.id))
+            const available = (allStudents as any[])
+                .filter(s => s.person && !enrolledSet.has(s.id))
                 .map(s => ({
                     id: s.id,
                     first_name: s.person.first_name,

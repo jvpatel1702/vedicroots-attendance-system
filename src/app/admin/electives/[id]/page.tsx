@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import ClassesTable from "@/components/admin/electives/ClassesTable"
 
 // Page to list all generated classes for an offering, allowing cancellations/rescheduling
-export default async function OfferingManagementPage({ params }: { params: { id: string } }) {
+export default async function OfferingManagementPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
     const classes = await getElectiveClasses(id)
 
