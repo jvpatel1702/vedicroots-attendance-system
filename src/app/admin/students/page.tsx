@@ -11,7 +11,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabaseClient';
-import { Plus, Edit, Calendar, FileSpreadsheet, Trash2, Users, CheckSquare, Square, X, GraduationCap } from 'lucide-react';
+import { Plus, Edit, Calendar, FileSpreadsheet, Trash2, Users, CheckSquare, Square, X, GraduationCap, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 import StudentForm from '@/components/admin/StudentForm';
 import VacationModal from '@/components/admin/VacationModal';
 import CsvStudentImport from '@/components/admin/CsvStudentImport';
@@ -130,19 +131,14 @@ export default function StudentsPage() {
 
     const fetchGrades = useCallback(async () => {
         if (!selectedOrganization) return;
-        const { data: programs } = await supabase
-            .from('programs')
-            .select('id')
-            .eq('organization_id', selectedOrganization.id);
 
-        if (programs && programs.length > 0) {
-            const { data } = await supabase
-                .from('grades')
-                .select('id, name')
-                .in('program_id', programs.map(p => p.id))
-                .order('order');
-            if (data) setGrades(data);
-        }
+        // Fetch grades directly by organization_id
+        const { data } = await supabase
+            .from('grades')
+            .select('id, name')
+            .eq('organization_id', selectedOrganization.id)
+            .order('order');
+        if (data) setGrades(data);
     }, [supabase, selectedOrganization]);
 
     useEffect(() => {
@@ -452,7 +448,7 @@ export default function StudentsPage() {
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Full Name</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Classroom</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Grade</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase text-right">Actions</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -483,7 +479,9 @@ export default function StudentsPage() {
                                                 )}
                                             </div>
                                             <div>
-                                                <p className="font-semibold text-gray-900">{student.person.first_name} {student.person.last_name}</p>
+                                                <Link href={`/admin/students/${student.id}`} className="font-semibold text-gray-900 hover:text-indigo-600 hover:underline transition-colors">
+                                                    {student.person.first_name} {student.person.last_name}
+                                                </Link>
                                                 <p className="text-xs text-gray-400">ID: {student.student_number}</p>
                                             </div>
                                         </div>
@@ -502,23 +500,13 @@ export default function StudentsPage() {
                                             })()}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => setVacationStudent(student)}
-                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg tooltip"
-                                                title="Manage Vacations"
-                                            >
-                                                <Calendar size={18} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleEdit(student)}
-                                                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                                                title="Edit Details"
-                                            >
-                                                <Edit size={18} />
-                                            </button>
-                                        </div>
+                                    <td className="px-6 py-4">
+                                        <Link
+                                            href={`/admin/students/${student.id}`}
+                                            className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                                        >
+                                            View Details →
+                                        </Link>
                                     </td>
                                 </tr>
                             ))

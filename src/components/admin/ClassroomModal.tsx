@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { X, Save, Trash2 } from 'lucide-react';
+import { useOrganization } from '@/context/OrganizationContext';
 
 interface Classroom {
     id: string;
@@ -19,6 +20,7 @@ interface Props {
 
 export default function ClassroomModal({ isOpen, onClose, classroom, onSuccess }: Props) {
     const supabase = createClient();
+    const { selectedOrganization } = useOrganization();
     const [name, setName] = useState('');
     const [capacity, setCapacity] = useState(20);
     const [locationId, setLocationId] = useState('');
@@ -26,10 +28,13 @@ export default function ClassroomModal({ isOpen, onClose, classroom, onSuccess }
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (isOpen) {
-            // Fetch locations
+        if (isOpen && selectedOrganization) {
+            // Fetch locations filtered by organization
             const fetchLocations = async () => {
-                const { data } = await supabase.from('locations').select('id, name');
+                const { data } = await supabase
+                    .from('locations')
+                    .select('id, name')
+                    .eq('organization_id', selectedOrganization.id);
                 if (data) {
                     setLocations(data);
                     // Default to first location if none selected and only one exists

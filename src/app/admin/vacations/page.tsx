@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { Calendar, Plus, Search, Trash2, User } from 'lucide-react';
 import VacationModal from '@/components/admin/VacationModal';
+import { useOrganization } from '@/context/OrganizationContext';
 
 interface Student {
     id: string;
@@ -27,6 +28,7 @@ interface Vacation {
 
 export default function VacationsPage() {
     const supabase = createClient();
+    const { selectedOrganization } = useOrganization();
     const [vacations, setVacations] = useState<Vacation[]>([]);
     const [loading, setLoading] = useState(true);
     const [students, setStudents] = useState<Student[]>([]);
@@ -36,38 +38,59 @@ export default function VacationsPage() {
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
     const fetchVacations = useCallback(async () => {
+        if (!selectedOrganization) return;
         setLoading(true);
-        // Fetch all future/current vacations
+        // Fetch vacations filtered by organization via students -> persons
         const { data } = await supabase
             .from('student_vacations')
             .select(`
                 *,
-                students (first_name, last_name)
+                students!inner (
+                    first_name, last_name,
+                    person:persons!inner(organization_id)
+                )
             `)
-            .gte('end_date', new Date().toISOString().split('T')[0]) // Active only? Or all? Let's show all for now but ordered desc
+            .eq('students.person.organization_id', selectedOrganization.id)
+            .gte('end_date', new Date().toISOString().split('T')[0])
             .order('start_date', { ascending: true });
 
         if (data) setVacations(data as unknown as Vacation[]);
         setLoading(false);
-    }, [supabase]);
+    }, [supabase, selectedOrganization]);
 
     useEffect(() => {
-        fetchVacations();
-    }, [fetchVacations]);
+        if (selectedOrganization) {
+            fetchVacations();
+        }
+    }, [fetchVacations, selectedOrganization]);
 
     // Search students for adding new vacation
     const searchStudents = async (query: string) => {
-        if (!query) {
+        if (!query || !selectedOrganization) {
             setStudents([]);
             return;
         }
         const { data } = await supabase
             .from('students')
-            .select('id, first_name, last_name, profile_picture, classrooms(name)')
-            .ilike('first_name', `%${query}%`)
+            .select(`
+                id,
+                person:persons!inner(first_name, last_name, photo_url, organization_id),
+                classrooms(name)
+            `)
+            .eq('person.organization_id', selectedOrganization.id)
+            .ilike('person.first_name', `%${query}%`)
             .limit(5);
 
-        if (data) setStudents(data as unknown as Student[]);
+        if (data) {
+            const mapped = (data as any[]).filter(s => s.person).map(s => ({
+                id: s.id,
+                first_name: s.person.first_name,
+                last_name: s.person.last_name,
+                profile_picture: s.person.photo_url,
+                classrooms: s.classrooms
+            }));
+            setStudents(mapped as Student[]);
+        }
     };
 
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {

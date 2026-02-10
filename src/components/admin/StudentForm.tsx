@@ -84,10 +84,7 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
         if (isOpen) {
             const fetchMeta = async () => {
                 const { data: orgs } = await supabase.from('organizations').select('id, name').order('name');
-                const { data: grds } = await supabase.from('grades').select('*').order('order');
-
                 if (orgs) setOrganizations(orgs);
-                if (grds) setGrades(grds);
             };
             fetchMeta();
 
@@ -136,17 +133,30 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
         }
     }, [isOpen, student, supabase]);
 
-    // Fetch Locations when Org Changes
+
+    // Fetch Locations and Grades when Org Changes
     useEffect(() => {
         if (!formData.organizationId) {
             setLocations([]);
+            setGrades([]);
             return;
         }
-        const fetchLocations = async () => {
-            const { data } = await supabase.from('locations').select('id, name').eq('organization_id', formData.organizationId).order('name');
-            if (data) setLocations(data);
+        const fetchLocationsAndGrades = async () => {
+            const { data: locData } = await supabase
+                .from('locations')
+                .select('id, name')
+                .eq('organization_id', formData.organizationId)
+                .order('name');
+            if (locData) setLocations(locData);
+
+            const { data: gradeData } = await supabase
+                .from('grades')
+                .select('id, name')
+                .eq('organization_id', formData.organizationId)
+                .order('order');
+            if (gradeData) setGrades(gradeData);
         };
-        fetchLocations();
+        fetchLocationsAndGrades();
     }, [formData.organizationId, supabase]);
 
     // Fetch Classrooms when Location Changes

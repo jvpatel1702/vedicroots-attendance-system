@@ -98,20 +98,13 @@ export default function EnrollmentsPage() {
             if (data) setClassrooms(data);
         }
 
-        // Get programs for org
-        const { data: programs } = await supabase
-            .from('programs')
-            .select('id')
-            .eq('organization_id', selectedOrganization.id);
-
-        if (programs && programs.length > 0) {
-            const { data } = await supabase
-                .from('grades')
-                .select('id, name')
-                .in('program_id', programs.map(p => p.id))
-                .order('order');
-            if (data) setGrades(data);
-        }
+        // Fetch grades directly by organization_id
+        const { data: gradeData } = await supabase
+            .from('grades')
+            .select('id, name')
+            .eq('organization_id', selectedOrganization.id)
+            .order('order');
+        if (gradeData) setGrades(gradeData);
     }, [supabase, selectedOrganization]);
 
     // Fetch enrollments for selected year

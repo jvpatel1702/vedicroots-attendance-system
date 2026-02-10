@@ -47,20 +47,13 @@ export default function CsvStudentImport({ isOpen, onClose, onSuccess }: Props) 
     const fetchLookupData = async () => {
         if (!selectedOrganization) return;
 
-        // Fetch grades via programs linked to org
-        const { data: programData } = await supabase
-            .from('programs')
-            .select('id')
-            .eq('organization_id', selectedOrganization.id);
-
-        if (programData) {
-            const programIds = programData.map(p => p.id);
-            const { data: gradeData } = await supabase
-                .from('grades')
-                .select('id, name')
-                .in('program_id', programIds);
-            if (gradeData) setGrades(gradeData);
-        }
+        // Fetch grades directly by organization_id
+        const { data: gradeData } = await supabase
+            .from('grades')
+            .select('id, name')
+            .eq('organization_id', selectedOrganization.id)
+            .order('order');
+        if (gradeData) setGrades(gradeData);
 
         // Fetch classrooms via locations linked to org
         const { data: locationData } = await supabase
@@ -256,11 +249,11 @@ export default function CsvStudentImport({ isOpen, onClose, onSuccess }: Props) 
         const gradeCache: Record<string, string> = {};
         const classroomCache: Record<string, string> = {};
 
-        // Pre-populate cache with existing grades
+        // Pre-populate cache with existing grades for this org
         const { data: existingGrades } = await supabase
             .from('grades')
             .select('id, name')
-            .eq('program_id', programId);
+            .eq('organization_id', selectedOrganization.id);
         existingGrades?.forEach(g => { gradeCache[g.name.toLowerCase()] = g.id; });
 
         // Pre-populate cache with existing classrooms
@@ -277,10 +270,10 @@ export default function CsvStudentImport({ isOpen, onClose, onSuccess }: Props) 
                 let gradeId = gradeCache[gradeName.toLowerCase()];
 
                 if (!gradeId) {
-                    // Create the grade
+                    // Create the grade with organization_id
                     const { data: newGrade, error: gradeError } = await supabase
                         .from('grades')
-                        .insert({ program_id: programId, name: gradeName, order: Object.keys(gradeCache).length + 1 })
+                        .insert({ organization_id: selectedOrganization.id, name: gradeName, order: Object.keys(gradeCache).length + 1 })
                         .select()
                         .single();
 

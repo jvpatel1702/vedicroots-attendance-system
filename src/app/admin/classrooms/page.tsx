@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabaseClient';
-import { Users, GraduationCap, Plus, Edit } from 'lucide-react';
+import { Users, GraduationCap, Plus, ExternalLink } from 'lucide-react';
 import ClassroomModal from '@/components/admin/ClassroomModal';
+import { useOrganization } from '@/context/OrganizationContext';
+import Link from 'next/link';
 
 interface ClassroomGrade {
     grades: {
@@ -31,19 +33,22 @@ interface Classroom {
 
 export default function ClassroomsPage() {
     const supabase = createClient();
+    const { selectedOrganization } = useOrganization();
     const [classrooms, setClassrooms] = useState<Classroom[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedClassroom, setSelectedClassroom] = useState<Classroom | null>(null);
 
     const fetchClassrooms = useCallback(async () => {
+        if (!selectedOrganization) return;
         setLoading(true);
 
-        // Fetch classrooms with relationships
+        // Fetch classrooms filtered by organization via locations
         const { data } = await supabase
             .from('classrooms')
             .select(`
                 *,
+                locations!inner(organization_id),
                 classroom_grades (
                     grades (name)
                 ),
@@ -54,15 +59,18 @@ export default function ClassroomsPage() {
                 ),
                 enrollments (count)
             `)
+            .eq('locations.organization_id', selectedOrganization.id)
             .order('name');
 
         if (data) setClassrooms(data as unknown as Classroom[]);
         setLoading(false);
-    }, [supabase]);
+    }, [supabase, selectedOrganization]);
 
     useEffect(() => {
-        fetchClassrooms();
-    }, [fetchClassrooms]);
+        if (selectedOrganization) {
+            fetchClassrooms();
+        }
+    }, [fetchClassrooms, selectedOrganization]);
 
     const handleAdd = () => {
         setSelectedClassroom(null);
@@ -96,15 +104,14 @@ export default function ClassroomsPage() {
                     <div className="col-span-full py-20 text-center text-gray-400">No classrooms found. Add one to get started.</div>
                 ) : (
                     classrooms.map(cls => (
-                        <div key={cls.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col h-full group relative">
-
-                            <button
-                                onClick={() => handleEdit(cls)}
-                                className="absolute top-4 right-4 text-gray-300 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-all p-1"
-                                title="Edit Classroom"
-                            >
-                                <Edit size={16} />
-                            </button>
+                        <Link
+                            key={cls.id}
+                            href={`/admin/classrooms/${cls.id}`}
+                            className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col h-full group relative hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer"
+                        >
+                            <div className="absolute top-4 right-4 text-gray-300 group-hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-all p-1">
+                                <ExternalLink size={16} />
+                            </div>
 
                             <div className="flex items-start justify-between mb-4">
                                 <div>
@@ -149,7 +156,7 @@ export default function ClassroomsPage() {
                                     <span>{cls.enrollments?.[0]?.count || 0} Students Enrolled</span>
                                 </div>
                             </div>
-                        </div>
+                        </Link>
                     ))
                 )}
             </div>

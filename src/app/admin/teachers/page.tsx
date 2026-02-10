@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { Plus, Edit } from 'lucide-react';
 import TeacherForm from '@/components/admin/TeacherForm';
+import { useOrganization } from '@/context/OrganizationContext';
 
 interface TeacherClassroom {
     classrooms: { name: string } | null;
@@ -18,29 +19,32 @@ interface TeacherProfile {
 
 export default function TeachersPage() {
     const supabase = createClient();
+    const { selectedOrganization } = useOrganization();
     const [teachers, setTeachers] = useState<TeacherProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingTeacher, setEditingTeacher] = useState<TeacherProfile | null>(null);
 
     const fetchTeachers = useCallback(async () => {
+        if (!selectedOrganization) return;
         setLoading(true);
-        // Fetch staff with role teacher AND their assigned classrooms
+        // Fetch staff with role teacher AND their assigned classrooms, filtered by organization
         const { data: staffList } = await supabase
             .from('staff')
             .select(`
                 id,
                 email,
                 role,
-                persons (first_name, last_name),
+                persons!inner(first_name, last_name, organization_id),
                 teacher_classrooms (
                     classrooms (name)
                 )
             `)
-            .eq('role', 'TEACHER');
+            .eq('role', 'TEACHER')
+            .eq('persons.organization_id', selectedOrganization.id);
 
         if (staffList) {
-            const mappedTeachers: TeacherProfile[] = staffList.map((s: any) => ({
+            const mappedTeachers: TeacherProfile[] = (staffList as any[]).filter(s => s.persons).map((s: any) => ({
                 id: s.id,
                 name: s.persons ? `${s.persons.first_name} ${s.persons.last_name}` : 'Unknown',
                 email: s.email || '',
@@ -49,11 +53,13 @@ export default function TeachersPage() {
             setTeachers(mappedTeachers);
         }
         setLoading(false);
-    }, [supabase]);
+    }, [supabase, selectedOrganization]);
 
     useEffect(() => {
-        fetchTeachers();
-    }, [fetchTeachers]);
+        if (selectedOrganization) {
+            fetchTeachers();
+        }
+    }, [fetchTeachers, selectedOrganization]);
 
     const handleEdit = (teacher: TeacherProfile) => {
         setEditingTeacher(teacher);

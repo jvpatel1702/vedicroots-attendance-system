@@ -72,11 +72,12 @@ export default function AddEnrollmentModal({ isOpen, onClose, onSuccess, academi
         const fetchData = async () => {
             if (!selectedOrganization) return;
 
-            // Fetch Grades & Locations (Org contextual)
+            // Fetch Grades filtered by org
             const { data: gradeData } = await supabase
                 .from('grades')
                 .select('id, name')
-                .order('name'); // Grades might be program specific, but for now fetch all
+                .eq('organization_id', selectedOrganization.id)
+                .order('order');
 
             const { data: locData } = await supabase
                 .from('locations')
