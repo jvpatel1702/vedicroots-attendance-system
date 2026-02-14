@@ -31,10 +31,11 @@ async function debugStaff() {
     }
 
     console.log(`Found ${staff?.length} staff records.`);
-    staff?.forEach(s => {
+    staff?.forEach((s: any) => {
         console.log(`- ID: ${s.id} | Email: ${s.email} | Role: ${s.role}`);
-        if (s.persons) {
-            console.log(`  Person: ${s.persons.first_name} ${s.persons.last_name} (Org: ${s.persons.organization_id})`);
+        const person = Array.isArray(s.persons) ? s.persons[0] : s.persons;
+        if (person) {
+            console.log(`  Person: ${person.first_name} ${person.last_name} (Org: ${person.organization_id})`);
         } else {
             console.log(`  Person: NULL`);
         }
