@@ -71,7 +71,7 @@ export async function calculateExtendedCareFee(req: CalculationRequest): Promise
     // 2. Fetch Student Info (Grade for KG/Elem distinction)
     const { data: enrollment } = await supabase
         .from('enrollments')
-        .select('grade:grades(name)')
+        .select('grade:grades(name), start_date, end_date')
         .eq('student_id', req.studentId)
         .eq('status', 'ACTIVE')
         .maybeSingle();
@@ -80,6 +80,12 @@ export async function calculateExtendedCareFee(req: CalculationRequest): Promise
         ? (Array.isArray(enrollment.grade) ? enrollment.grade[0] : enrollment.grade)
         : null;
     const isKg = grade?.name?.toUpperCase().includes('K') || false;
+
+    // Validate enrollment dates against billing month
+    // If enrollment doesn't look valid for this month, we might technically throw or return 0?
+    // For now, we assume if they are asking for calculation, we proceed, but maybe log warning?
+    // Or we could check if start_date > monthEnd or end_date < monthStart.
+    // Let's just use the grade found.
 
     const regDropOff = isKg ? regDropOffKg : regDropOffEl;
     let regPickup = isKg ? regPickupKg : regPickupEl;

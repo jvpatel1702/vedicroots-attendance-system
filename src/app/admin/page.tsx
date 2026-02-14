@@ -132,7 +132,7 @@ export default function AdminDashboard() {
             const { data: enrollmentData, error: admError } = await supabase
                 .from('enrollments')
                 .select(`
-                    enrollment_date, 
+                    start_date, 
                     end_date, 
                     students(first_name, last_name),
                     classrooms!inner(
@@ -140,34 +140,34 @@ export default function AdminDashboard() {
                     )
                 `)
                 .eq('classrooms.locations.organization_id', orgId)
-                .or(`enrollment_date.gte.${startOfMonth},end_date.gte.${startOfMonth}`);
+                .or(`start_date.gte.${startOfMonth},end_date.gte.${startOfMonth}`);
 
             if (admError) console.error("Error fetching admissions:", admError);
 
             const admissionList: any[] = [];
             if (enrollmentData) {
                 enrollmentData.forEach((e: any) => {
-                    const eDate = new Date(e.enrollment_date);
+                    const sDate = new Date(e.start_date);
                     const endDate = e.end_date ? new Date(e.end_date) : null;
                     const now = new Date();
                     const currentMonth = now.getMonth();
                     const nextMonth = (currentMonth + 1) % 12;
 
                     // Joining This Month
-                    if (eDate.getMonth() === currentMonth && eDate.getFullYear() === now.getFullYear()) {
+                    if (sDate.getMonth() === currentMonth && sDate.getFullYear() === now.getFullYear()) {
                         admissionList.push({
                             id: Math.random().toString(),
                             name: `${e.students.first_name} ${e.students.last_name}`,
-                            date: e.enrollment_date,
+                            date: e.start_date,
                             type: 'JOINING'
                         });
                     }
                     // Joining Next Month
-                    else if (eDate.getMonth() === nextMonth) {
+                    else if (sDate.getMonth() === nextMonth) {
                         admissionList.push({
                             id: Math.random().toString(),
                             name: `${e.students.first_name} ${e.students.last_name}`,
-                            date: e.enrollment_date,
+                            date: e.start_date,
                             type: 'UPCOMING'
                         });
                     }

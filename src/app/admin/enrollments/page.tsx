@@ -37,6 +37,8 @@ interface Enrollment {
         id: string;
         name: string;
     } | null;
+    start_date: string;
+    end_date: string | null;
 }
 
 interface Classroom {
@@ -63,7 +65,13 @@ export default function EnrollmentsPage() {
 
     // Editing state
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [editForm, setEditForm] = useState({ classroom_id: '', grade_id: '', status: '' });
+    const [editForm, setEditForm] = useState({
+        classroom_id: '',
+        grade_id: '',
+        status: '',
+        start_date: '',
+        end_date: ''
+    });
 
     // Fetch academic years
     const fetchAcademicYears = useCallback(async () => {
@@ -113,6 +121,8 @@ export default function EnrollmentsPage() {
         if (!selectedYear) return;
         setLoading(true);
 
+
+        // Fetching enrollments with start_date and end_date
         const { data, error } = await supabase
             .from('enrollments')
             .select(`
@@ -130,10 +140,13 @@ export default function EnrollmentsPage() {
                     id,
                     name
                 ),
+
                 grade:grades!grade_id (
                     id,
                     name
-                )
+                ),
+                start_date,
+                end_date
             `)
             .order('created_at', { ascending: false });
 
@@ -166,7 +179,9 @@ export default function EnrollmentsPage() {
         setEditForm({
             classroom_id: enrollment.classroom?.id || '',
             grade_id: enrollment.grade?.id || '',
-            status: enrollment.status
+            status: enrollment.status,
+            start_date: enrollment.start_date,
+            end_date: enrollment.end_date || ''
         });
     };
 
@@ -178,7 +193,9 @@ export default function EnrollmentsPage() {
             .update({
                 classroom_id: editForm.classroom_id || null,
                 grade_id: editForm.grade_id || null,
-                status: editForm.status
+                status: editForm.status,
+                start_date: editForm.start_date,
+                end_date: editForm.end_date || null
             })
             .eq('id', editingId);
 
@@ -325,6 +342,7 @@ export default function EnrollmentsPage() {
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Student</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Classroom</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Grade</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Dates</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Status</th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase text-right">Actions</th>
                         </tr>
@@ -384,6 +402,38 @@ export default function EnrollmentsPage() {
                                             <span className="px-2 py-1 bg-gray-100 rounded text-xs font-medium">
                                                 {enrollment.grade?.name || 'N/A'}
                                             </span>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {editingId === enrollment.id ? (
+                                            <div className="flex flex-col gap-2">
+                                                <div className="text-xs">
+                                                    <span className="text-gray-500 block mb-1">Start:</span>
+                                                    <input
+                                                        type="date"
+                                                        value={editForm.start_date}
+                                                        onChange={(e) => setEditForm({ ...editForm, start_date: e.target.value })}
+                                                        className="border rounded px-2 py-1 text-xs w-full"
+                                                        required
+                                                    />
+                                                </div>
+                                                <div className="text-xs">
+                                                    <span className="text-gray-500 block mb-1">End:</span>
+                                                    <input
+                                                        type="date"
+                                                        value={editForm.end_date}
+                                                        onChange={(e) => setEditForm({ ...editForm, end_date: e.target.value })}
+                                                        className="border rounded px-2 py-1 text-xs w-full"
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="text-sm text-gray-600">
+                                                <div><span className="text-xs text-gray-400">Start:</span> {enrollment.start_date}</div>
+                                                {enrollment.end_date && (
+                                                    <div><span className="text-xs text-gray-400">End:</span> {enrollment.end_date}</div>
+                                                )}
+                                            </div>
                                         )}
                                     </td>
                                     <td className="px-6 py-4">

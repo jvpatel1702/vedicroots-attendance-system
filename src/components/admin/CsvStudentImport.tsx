@@ -356,7 +356,8 @@ export default function CsvStudentImport({ isOpen, onClose, onSuccess }: Props) 
                         classroom_id: classroomId,
                         grade_id: gradeId,
                         academic_year_id: academicYearId,
-                        status: 'ACTIVE'
+                        status: 'ACTIVE',
+                        start_date: new Date().toISOString().split('T')[0]
                     });
                     if (enrollError) console.error('Enrollment error:', enrollError);
                 }

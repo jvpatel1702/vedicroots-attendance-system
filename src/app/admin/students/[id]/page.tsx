@@ -28,6 +28,8 @@ interface Vacation {
 interface Enrollment {
     id: string;
     status: string;
+    start_date: string;
+    end_date: string | null;
     classroom_id: string | null;
     grade_id: string | null;
     academic_year_id: string | null;
@@ -129,7 +131,14 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     // Enrollments
     const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
     const [showAddEnrollment, setShowAddEnrollment] = useState(false);
-    const [newEnrollment, setNewEnrollment] = useState({ classroom_id: '', grade_id: '', academic_year_id: '', status: 'ACTIVE' });
+    const [newEnrollment, setNewEnrollment] = useState({
+        classroom_id: '',
+        grade_id: '',
+        academic_year_id: '',
+        status: 'ACTIVE',
+        start_date: new Date().toISOString().split('T')[0],
+        end_date: ''
+    });
 
     // Extended Care Subscriptions
     const [ecSubscriptions, setEcSubscriptions] = useState<ExtendedCareSubscription[]>([]);
@@ -227,7 +236,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         const { data: enrollmentData } = await supabase
             .from('enrollments')
             .select(`
-                id, status, classroom_id, grade_id, academic_year_id,
+                id, status, classroom_id, grade_id, academic_year_id, start_date, end_date,
                 classrooms (id, name),
                 grades (id, name),
                 academic_years (id, name)
@@ -390,10 +399,19 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 classroom_id: newEnrollment.classroom_id,
                 grade_id: newEnrollment.grade_id || null,
                 academic_year_id: newEnrollment.academic_year_id,
-                status: newEnrollment.status
+                status: newEnrollment.status,
+                start_date: newEnrollment.start_date,
+                end_date: newEnrollment.end_date || null
             });
         if (error) alert('Error: ' + error.message);
-        setNewEnrollment({ classroom_id: '', grade_id: '', academic_year_id: '', status: 'ACTIVE' });
+        setNewEnrollment({
+            classroom_id: '',
+            grade_id: '',
+            academic_year_id: '',
+            status: 'ACTIVE',
+            start_date: new Date().toISOString().split('T')[0],
+            end_date: ''
+        });
         setShowAddEnrollment(false);
         setSaving(false);
         fetchStudent();
@@ -609,6 +627,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                                     <th className="px-4 py-2 text-left text-gray-600 font-medium">Classroom</th>
                                     <th className="px-4 py-2 text-left text-gray-600 font-medium">Grade</th>
                                     <th className="px-4 py-2 text-left text-gray-600 font-medium">Year</th>
+                                    <th className="px-4 py-2 text-left text-gray-600 font-medium">Dates</th>
                                     <th className="px-4 py-2 text-left text-gray-600 font-medium">Status</th>
                                 </tr>
                             </thead>
@@ -618,6 +637,10 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                                         <td className="px-4 py-3 text-gray-900">{e.classrooms?.name || 'Unassigned'}</td>
                                         <td className="px-4 py-3 text-gray-600">{e.grades?.name || 'N/A'}</td>
                                         <td className="px-4 py-3 text-gray-600">{e.academic_years?.name || 'N/A'}</td>
+                                        <td className="px-4 py-3 text-gray-600 text-xs">
+                                            <div>Start: {e.start_date}</div>
+                                            {e.end_date && <div>End: {e.end_date}</div>}
+                                        </td>
                                         <td className="px-4 py-3">
                                             <select value={e.status} onChange={ev => handleUpdateEnrollmentStatus(e.id, ev.target.value)}
                                                 className={`text-xs px-2 py-1 rounded font-medium border-0 ${e.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
@@ -651,6 +674,26 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                                 <option value="">Select Year</option>
                                 {academicYears.map(y => <option key={y.id} value={y.id}>{y.name} {y.is_active ? '(Active)' : ''}</option>)}
                             </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+                                <input
+                                    type="date"
+                                    value={newEnrollment.start_date}
+                                    onChange={e => setNewEnrollment({ ...newEnrollment, start_date: e.target.value })}
+                                    className="border border-gray-300 rounded p-2 text-sm w-full"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
+                                <input
+                                    type="date"
+                                    value={newEnrollment.end_date}
+                                    onChange={e => setNewEnrollment({ ...newEnrollment, end_date: e.target.value })}
+                                    className="border border-gray-300 rounded p-2 text-sm w-full"
+                                />
+                            </div>
                         </div>
                         <div className="flex gap-2">
                             <button onClick={handleAddEnrollment} disabled={saving} className="flex-1 bg-green-600 text-white py-2 rounded text-sm font-medium">Add Enrollment</button>

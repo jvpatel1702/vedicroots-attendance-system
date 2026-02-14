@@ -13,6 +13,8 @@ interface EnrollmentDetail {
     grade_id: string;
     status: string;
     enrollment_date: string;
+    start_date: string;
+    end_date: string | null;
     student: {
         id: string;
         person: {
@@ -70,6 +72,8 @@ export default function EnrollmentDetailPage({ params }: { params: Promise<{ id:
                 grade_id,
                 status,
                 enrollment_date,
+                start_date,
+                end_date,
                 student:students (
                     id,
                     person:persons (
@@ -268,9 +272,15 @@ export default function EnrollmentDetailPage({ params }: { params: Promise<{ id:
                     </h2>
                     <div className="space-y-3">
                         <div className="flex justify-between items-center py-2 border-b border-gray-50">
-                            <span className="text-sm text-gray-600">Enrollment Date</span>
+                            <span className="text-sm text-gray-600">Start Date</span>
                             <span className="text-sm font-medium text-gray-900">
-                                {enrollment.enrollment_date ? new Date(enrollment.enrollment_date).toLocaleDateString() : 'N/A'}
+                                {enrollment.start_date ? new Date(enrollment.start_date).toLocaleDateString() : 'N/A'}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-gray-50">
+                            <span className="text-sm text-gray-600">End Date</span>
+                            <span className="text-sm font-medium text-gray-900">
+                                {enrollment.end_date ? new Date(enrollment.end_date).toLocaleDateString() : '-'}
                             </span>
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-gray-50">

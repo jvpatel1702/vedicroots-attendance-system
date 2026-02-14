@@ -57,6 +57,8 @@ export default function AddEnrollmentModal({ isOpen, onClose, onSuccess, academi
     const [singleLocationId, setSingleLocationId] = useState('');
     const [singleClassroomId, setSingleClassroomId] = useState('');
     const [singleGradeId, setSingleGradeId] = useState('');
+    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [endDate, setEndDate] = useState('');
 
     // Bulk Enroll State
     const [unenrolledStudents, setUnenrolledStudents] = useState<Student[]>([]);
@@ -215,7 +217,9 @@ export default function AddEnrollmentModal({ isOpen, onClose, onSuccess, academi
             grade_id: singleGradeId,
             classroom_id: singleClassroomId,
             academic_year_id: academicYearId,
-            status: 'ACTIVE'
+            status: 'ACTIVE',
+            start_date: startDate,
+            end_date: endDate || null
         });
 
         if (error) {
@@ -236,7 +240,9 @@ export default function AddEnrollmentModal({ isOpen, onClose, onSuccess, academi
             grade_id: bulkGradeId,
             classroom_id: bulkClassroomId,
             academic_year_id: academicYearId,
-            status: 'ACTIVE'
+            status: 'ACTIVE',
+            start_date: startDate,
+            end_date: endDate || null
         }));
 
         const { error } = await supabase.from('enrollments').insert(enrollments);
@@ -260,6 +266,10 @@ export default function AddEnrollmentModal({ isOpen, onClose, onSuccess, academi
         setBulkClassroomId('');
         setBulkGradeId('');
         setBulkLocationId('');
+        setBulkGradeId('');
+        setBulkLocationId('');
+        setStartDate(new Date().toISOString().split('T')[0]);
+        setEndDate('');
         onClose();
     };
 
@@ -440,6 +450,28 @@ export default function AddEnrollmentModal({ isOpen, onClose, onSuccess, academi
                                         </select>
                                     </div>
                                 </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Start Date <span className="text-red-500">*</span></label>
+                                        <input
+                                            type="date"
+                                            value={startDate}
+                                            onChange={(e) => setStartDate(e.target.value)}
+                                            required
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-olive outline-none bg-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">End Date <span className="text-gray-400 font-normal">(Optional)</span></label>
+                                        <input
+                                            type="date"
+                                            value={endDate}
+                                            onChange={(e) => setEndDate(e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-olive outline-none bg-white"
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     ) : (
@@ -492,6 +524,27 @@ export default function AddEnrollmentModal({ isOpen, onClose, onSuccess, academi
                                             <option value="">Select...</option>
                                             {filteredClassrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                         </select>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 mt-3">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Start Date <span className="text-red-500">*</span></label>
+                                        <input
+                                            type="date"
+                                            value={startDate}
+                                            onChange={(e) => setStartDate(e.target.value)}
+                                            required
+                                            className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-brand-olive outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">End Date</label>
+                                        <input
+                                            type="date"
+                                            value={endDate}
+                                            onChange={(e) => setEndDate(e.target.value)}
+                                            className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-brand-olive outline-none"
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -560,7 +613,7 @@ export default function AddEnrollmentModal({ isOpen, onClose, onSuccess, academi
                     {activeTab === 'single' ? (
                         <button
                             onClick={handleSingleSubmit}
-                            disabled={!selectedStudent || !singleClassroomId || loading}
+                            disabled={!selectedStudent || !singleClassroomId || !startDate || loading}
                             className="px-6 py-2 bg-brand-olive text-white rounded-lg hover:bg-opacity-90 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg active:scale-95"
                         >
                             {loading ? 'Enrolling...' : 'Enroll Student'}
@@ -568,7 +621,7 @@ export default function AddEnrollmentModal({ isOpen, onClose, onSuccess, academi
                     ) : (
                         <button
                             onClick={handleBulkSubmit}
-                            disabled={selectedBulkIds.size === 0 || !bulkClassroomId || loading}
+                            disabled={selectedBulkIds.size === 0 || !bulkClassroomId || !startDate || loading}
                             className="px-6 py-2 bg-brand-olive text-white rounded-lg hover:bg-opacity-90 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg active:scale-95"
                         >
                             {loading ? 'Processing...' : `Enroll ${selectedBulkIds.size} Students`}
@@ -576,8 +629,8 @@ export default function AddEnrollmentModal({ isOpen, onClose, onSuccess, academi
                     )}
                 </div>
 
-            </div>
-        </div>
+            </div >
+        </div >
     );
 
 }

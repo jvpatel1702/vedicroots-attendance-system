@@ -79,6 +79,7 @@ export default function TeacherAttendancePage() {
         const { data: enrollments } = await supabase
             .from('enrollments')
             .select(`
+                start_date, end_date,
                 student:students(
                     id, student_number,
                     person:persons(first_name, last_name)
@@ -89,6 +90,9 @@ export default function TeacherAttendancePage() {
 
         if (enrollments) {
             const studentList = enrollments
+                .filter((e: any) => {
+                    return e.start_date <= date && (!e.end_date || e.end_date >= date);
+                })
                 .map((e: any) => e.student)
                 .filter(Boolean)
                 .filter((s: any) => s.person);
@@ -241,8 +245,8 @@ export default function TeacherAttendancePage() {
                                     <button
                                         onClick={() => markAttendance(student.id, 'PRESENT')}
                                         className={`p-2 rounded-lg transition-colors ${attendance[student.id] === 'PRESENT'
-                                                ? 'bg-green-500 text-white'
-                                                : 'bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-600'
+                                            ? 'bg-green-500 text-white'
+                                            : 'bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-600'
                                             }`}
                                     >
                                         <Check size={18} />
@@ -250,8 +254,8 @@ export default function TeacherAttendancePage() {
                                     <button
                                         onClick={() => markAttendance(student.id, 'ABSENT')}
                                         className={`p-2 rounded-lg transition-colors ${attendance[student.id] === 'ABSENT'
-                                                ? 'bg-red-500 text-white'
-                                                : 'bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600'
+                                            ? 'bg-red-500 text-white'
+                                            : 'bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600'
                                             }`}
                                     >
                                         <X size={18} />
@@ -259,8 +263,8 @@ export default function TeacherAttendancePage() {
                                     <button
                                         onClick={() => markAttendance(student.id, 'LATE')}
                                         className={`p-2 rounded-lg transition-colors ${attendance[student.id] === 'LATE'
-                                                ? 'bg-yellow-500 text-white'
-                                                : 'bg-gray-100 text-gray-500 hover:bg-yellow-100 hover:text-yellow-600'
+                                            ? 'bg-yellow-500 text-white'
+                                            : 'bg-gray-100 text-gray-500 hover:bg-yellow-100 hover:text-yellow-600'
                                             }`}
                                     >
                                         <Clock size={18} />

@@ -33,13 +33,19 @@ export const navItems: NavItem[] = [
         roles: ['ADMIN', 'TEACHER', 'OFFICE']
     },
     {
+        title: 'Students',
+        href: '/admin/students',
+        icon: Users,
+        roles: ['ADMIN', 'TEACHER', 'OFFICE']
+    },
+    {
         title: 'Staff',
         href: '/admin/staff',
         icon: UserCheck,
         roles: ['ADMIN', 'OFFICE']
     },
     {
-        title: 'Staff Log',
+        title: 'Timesheet',
         href: '/admin/staff-attendance',
         icon: Clock,
         roles: ['ADMIN', 'OFFICE']
@@ -56,12 +62,6 @@ export const navItems: NavItem[] = [
         icon: BookOpen,
         roles: ['ADMIN', 'TEACHER', 'OFFICE'],
         organizationTypes: ['SCHOOL'] // Only show for schools, not daycare
-    },
-    {
-        title: 'Students',
-        href: '/admin/students',
-        icon: Users,
-        roles: ['ADMIN', 'TEACHER', 'OFFICE']
     },
     {
         title: 'Enrollments',

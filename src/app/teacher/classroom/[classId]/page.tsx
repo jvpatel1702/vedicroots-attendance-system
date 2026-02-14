@@ -122,12 +122,20 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                 // Query Enrollments -> Students
                 const { data: enrollmentData } = await supabase
                     .from('enrollments')
-                    .select('student_id, students(*)')
+                    .select('student_id, start_date, end_date, students(*)')
                     .eq('classroom_id', classId)
                     .eq('status', 'ACTIVE'); // Only active
 
+                // Filter by date
+                const activeEnrollments = enrollmentData?.filter((e: any) => {
+                    if (!e.students) return false;
+                    const startDate = e.start_date;
+                    const endDate = e.end_date;
+                    return startDate <= date && (!endDate || endDate >= date);
+                }) || [];
+
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const studentData = enrollmentData?.map((e: any) => e.students).flat().filter(Boolean) || [];
+                const studentData = activeEnrollments.map((e: any) => e.students).flat().filter(Boolean) || [];
 
                 // Sort by first name
                 // studentData.sort((a,b) => a.first_name.localeCompare(b.first_name));
