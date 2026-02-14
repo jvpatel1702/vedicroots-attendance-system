@@ -147,8 +147,8 @@ export default function AdminDashboard() {
             const admissionList: any[] = [];
             if (enrollmentData) {
                 enrollmentData.forEach((e: any) => {
-                    const sDate = new Date(e.start_date);
-                    const endDate = e.end_date ? new Date(e.end_date) : null;
+                    const sDate = new Date(e.start_date + 'T00:00:00');
+                    const endDate = e.end_date ? new Date(e.end_date + 'T00:00:00') : null;
                     const now = new Date();
                     const currentMonth = now.getMonth();
                     const nextMonth = (currentMonth + 1) % 12;

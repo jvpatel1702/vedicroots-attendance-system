@@ -118,7 +118,7 @@ export function NewAdmissionsCard({ admissions }: { admissions: NewAdmission[] }
                                     {joining.map(a => (
                                         <div key={a.id} className="flex justify-between text-sm p-2 bg-purple-50/50 rounded border border-purple-100">
                                             <span className="font-medium text-gray-800">{a.name}</span>
-                                            <span className="text-gray-500 text-xs">{new Date(a.date).toLocaleDateString()}</span>
+                                            <span className="text-gray-500 text-xs">{new Date(a.date + 'T00:00:00').toLocaleDateString()}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -132,7 +132,7 @@ export function NewAdmissionsCard({ admissions }: { admissions: NewAdmission[] }
                                     {upcoming.map(a => (
                                         <div key={a.id} className="flex justify-between text-sm p-2 bg-blue-50/50 rounded border border-blue-100">
                                             <span className="font-medium text-gray-800">{a.name}</span>
-                                            <span className="text-gray-500 text-xs">{new Date(a.date).toLocaleDateString()}</span>
+                                            <span className="text-gray-500 text-xs">{new Date(a.date + 'T00:00:00').toLocaleDateString()}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -146,7 +146,7 @@ export function NewAdmissionsCard({ admissions }: { admissions: NewAdmission[] }
                                     {finishing.map(a => (
                                         <div key={a.id} className="flex justify-between text-sm p-2 bg-orange-50/50 rounded border border-orange-100">
                                             <span className="font-medium text-gray-800">{a.name}</span>
-                                            <span className="text-gray-500 text-xs">{new Date(a.date).toLocaleDateString()}</span>
+                                            <span className="text-gray-500 text-xs">{new Date(a.date + 'T00:00:00').toLocaleDateString()}</span>
                                         </div>
                                     ))}
                                 </div>

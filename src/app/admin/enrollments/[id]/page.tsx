@@ -12,7 +12,6 @@ interface EnrollmentDetail {
     classroom_id: string;
     grade_id: string;
     status: string;
-    enrollment_date: string;
     start_date: string;
     end_date: string | null;
     student: {
@@ -71,7 +70,7 @@ export default function EnrollmentDetailPage({ params }: { params: Promise<{ id:
                 classroom_id,
                 grade_id,
                 status,
-                enrollment_date,
+                status,
                 start_date,
                 end_date,
                 student:students (

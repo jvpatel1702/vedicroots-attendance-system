@@ -225,9 +225,10 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
                 .from('students')
                 .insert({
                     person_id: personData.id,
-                    student_number: formData.studentNumber || `S${Math.floor(Math.random() * 10000)}`,
-                    // Medical info moved to student_medical table
-                    tenant_id: formData.organizationId
+                    first_name: formData.firstName,
+                    last_name: formData.lastName,
+                    dob: formData.dob,
+                    student_number: formData.studentNumber || `S${Math.floor(Math.random() * 10000)}`
                 })
                 .select()
                 .single();
@@ -268,7 +269,8 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
                     .from('guardians')
                     .insert({
                         person_id: gPerson.id,
-                        tenant_id: formData.organizationId
+                        first_name: g.firstName,
+                        last_name: g.lastName
                     })
                     .select()
                     .single();
@@ -284,8 +286,7 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
                         guardian_id: guardianData.id,
                         relationship: g.relationship,
                         is_emergency_contact: g.isEmergency,
-                        is_pickup_authorized: g.isPickup,
-                        tenant_id: formData.organizationId
+                        is_pickup_authorized: g.isPickup
                     });
 
                 if (linkError) throw linkError;
@@ -304,7 +305,7 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
                             grade_id: formData.gradeId,
                             academic_year_id: year.id,
                             status: 'ACTIVE',
-                            enrollment_date: formData.enrollmentDate
+                            start_date: formData.enrollmentDate
                         });
                     if (enrollError) throw enrollError;
                 }
@@ -359,7 +360,7 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-                                    <input type="date" value={formData.dob} onChange={e => updateData('dob', e.target.value)} max={new Date().toISOString().split('T')[0]} className="input-std w-full border p-2 rounded-lg" />
+                                    <input type="date" value={formData.dob} onChange={e => updateData('dob', e.target.value)} max={new Date().toISOString().split('T')[0]} className="input-std w-full border p-2 rounded-lg" required />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Photo Upload</label>

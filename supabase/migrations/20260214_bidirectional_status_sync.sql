@@ -34,7 +34,8 @@ BEGIN
       
       IF NEW.status IN ('INACTIVE', 'WITHDRAWN', 'GRADUATED') THEN
           -- If closing the enrollment, set end date to today if it's not already set
-          IF NEW.end_date IS NULL THEN
+          -- BUT only if the enrollment has actually started. Future enrollments (INACTIVE pending start) should not have an end date.
+          IF NEW.end_date IS NULL AND NEW.start_date <= CURRENT_DATE THEN
               NEW.end_date := CURRENT_DATE;
           END IF;
       ELSIF NEW.status = 'ACTIVE' THEN
