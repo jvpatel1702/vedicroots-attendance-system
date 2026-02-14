@@ -12,7 +12,8 @@ import {
     FileText,
     TrendingUp,
     ClipboardList,
-    Timer
+    Timer,
+    Clock
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
@@ -32,9 +33,15 @@ export const navItems: NavItem[] = [
         roles: ['ADMIN', 'TEACHER', 'OFFICE']
     },
     {
-        title: 'General Settings',
-        href: '/admin/settings',
-        icon: Settings,
+        title: 'Staff',
+        href: '/admin/staff',
+        icon: UserCheck,
+        roles: ['ADMIN', 'OFFICE']
+    },
+    {
+        title: 'Staff Log',
+        href: '/admin/staff-attendance',
+        icon: Clock,
         roles: ['ADMIN', 'OFFICE']
     },
     {
@@ -44,7 +51,7 @@ export const navItems: NavItem[] = [
         roles: ['ADMIN', 'OFFICE']
     },
     {
-        title: 'Subjects',
+        title: 'Electives',
         href: '/admin/electives',
         icon: BookOpen,
         roles: ['ADMIN', 'TEACHER', 'OFFICE'],
@@ -66,12 +73,6 @@ export const navItems: NavItem[] = [
         title: 'Extended Care',
         href: '/admin/extended-care',
         icon: Timer,
-        roles: ['ADMIN', 'OFFICE']
-    },
-    {
-        title: 'Employees',
-        href: '/admin/teachers',
-        icon: UserCheck,
         roles: ['ADMIN', 'OFFICE']
     },
     {
@@ -108,6 +109,12 @@ export const navItems: NavItem[] = [
         title: 'Reports',
         href: '/admin/reports',
         icon: TrendingUp,
+        roles: ['ADMIN', 'OFFICE']
+    },
+    {
+        title: 'Settings',
+        href: '/admin/settings',
+        icon: Settings,
         roles: ['ADMIN', 'OFFICE']
     }
 ];

@@ -8,7 +8,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { useOrganization } from '@/context/OrganizationContext';
-import { Calendar, Users, Trash2, Edit, BookOpen, UserPlus } from 'lucide-react';
+import { Calendar, Users, Trash2, Edit, BookOpen, UserPlus, Eye } from 'lucide-react';
+import Link from 'next/link';
 import AddEnrollmentModal from '@/components/admin/AddEnrollmentModal';
 
 interface AcademicYear {
@@ -342,9 +343,9 @@ export default function EnrollmentsPage() {
                                                 {enrollment.student.person?.first_name?.[0] || '?'}
                                             </div>
                                             <div>
-                                                <p className="font-semibold text-gray-900">
+                                                <Link href={`/admin/students/${enrollment.student.id}`} className="font-semibold text-gray-900 hover:text-indigo-600 hover:underline">
                                                     {enrollment.student.person?.first_name} {enrollment.student.person?.last_name}
-                                                </p>
+                                                </Link>
                                                 <p className="text-xs text-gray-400">ID: {enrollment.student.student_number}</p>
                                             </div>
                                         </div>
@@ -421,6 +422,13 @@ export default function EnrollmentsPage() {
                                             </div>
                                         ) : (
                                             <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Link
+                                                    href={`/admin/enrollments/${enrollment.id}`}
+                                                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                                                    title="View Details"
+                                                >
+                                                    <Eye size={18} />
+                                                </Link>
                                                 <button
                                                     onClick={() => handleEdit(enrollment)}
                                                     className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg"

@@ -169,6 +169,7 @@ export default function ClassroomDetailPage({ params }: { params: Promise<{ id: 
 
     const toggleGrade = async (gradeId: string) => {
         const isCurrentlyMapped = classroomGradeIds.includes(gradeId);
+        console.log(`Toggling grade ${gradeId}. Currently mapped: ${isCurrentlyMapped}`);
 
         if (isCurrentlyMapped) {
             // Remove
@@ -178,16 +179,25 @@ export default function ClassroomDetailPage({ params }: { params: Promise<{ id: 
                 .eq('classroom_id', id)
                 .eq('grade_id', gradeId);
 
-            if (!error) {
+            if (error) {
+                console.error('Error removing grade:', error);
+                alert(`Failed to remove grade: ${error.message}`);
+            } else {
+                console.log('Grade removed successfully');
                 setClassroomGradeIds(prev => prev.filter(g => g !== gradeId));
             }
         } else {
             // Add
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('classroom_grades')
-                .insert({ classroom_id: id, grade_id: gradeId });
+                .insert({ classroom_id: id, grade_id: gradeId })
+                .select();
 
-            if (!error) {
+            if (error) {
+                console.error('Error adding grade:', error);
+                alert(`Failed to add grade: ${error.message}`);
+            } else {
+                console.log('Grade added successfully:', data);
                 setClassroomGradeIds(prev => [...prev, gradeId]);
             }
         }
@@ -290,29 +300,56 @@ export default function ClassroomDetailPage({ params }: { params: Promise<{ id: 
                         <GraduationCap size={18} className="text-green-600" />
                         Mapped Grades
                     </h2>
-                    {allGrades.length === 0 ? (
-                        <p className="text-sm text-gray-500">No grades configured for this organization.</p>
-                    ) : (
+
+                    <div className="space-y-4">
+                        {/* List of Mapped Grades */}
                         <div className="space-y-2">
-                            {allGrades.map(grade => (
-                                <button
-                                    key={grade.id}
-                                    onClick={() => toggleGrade(grade.id)}
-                                    className={`w-full text-left p-3 rounded-lg border transition-all flex items-center justify-between ${classroomGradeIds.includes(grade.id)
-                                        ? 'border-green-500 bg-green-50 text-green-800'
-                                        : 'border-gray-200 hover:border-gray-300 text-gray-700'
-                                        }`}
-                                >
-                                    <span className="font-medium">{grade.name}</span>
-                                    {classroomGradeIds.includes(grade.id) ? (
-                                        <X size={16} className="text-green-600" />
-                                    ) : (
-                                        <Plus size={16} className="text-gray-400" />
-                                    )}
-                                </button>
-                            ))}
+                            {classroomGradeIds.length === 0 ? (
+                                <p className="text-sm text-gray-500 italic">No grades mapped to this classroom.</p>
+                            ) : (
+                                classroomGradeIds.map(gradeId => {
+                                    const grade = allGrades.find(g => g.id === gradeId);
+                                    if (!grade) return null;
+                                    return (
+                                        <div key={gradeId} className="flex items-center justify-between p-3 bg-green-50 border border-green-100 rounded-lg">
+                                            <span className="font-medium text-green-800">{grade.name}</span>
+                                            <button
+                                                onClick={() => toggleGrade(gradeId)}
+                                                className="text-green-600 hover:text-green-800 p-1 hover:bg-green-100 rounded"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    );
+                                })
+                            )}
                         </div>
-                    )}
+
+                        {/* Add Grade Dropdown */}
+                        <div className="pt-4 border-t border-gray-100">
+                            <label className="block text-xs font-semibold text-gray-500 uppercase mb-2">Add Grade</label>
+                            <div className="flex gap-2">
+                                <select
+                                    className="flex-1 border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                                    onChange={(e) => {
+                                        if (e.target.value) {
+                                            toggleGrade(e.target.value);
+                                            e.target.value = ''; // Reset select
+                                        }
+                                    }}
+                                    defaultValue=""
+                                >
+                                    <option value="" disabled>Select a grade to add...</option>
+                                    {allGrades
+                                        .filter(g => !classroomGradeIds.includes(g.id))
+                                        .map(g => (
+                                            <option key={g.id} value={g.id}>{g.name}</option>
+                                        ))
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Teachers */}

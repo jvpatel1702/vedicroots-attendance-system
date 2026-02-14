@@ -44,7 +44,7 @@ export async function middleware(request: NextRequest) {
         // Get user role from database
         const { data: profile } = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, roles')
             .eq('id', user.id)
             .single()
 
@@ -53,29 +53,31 @@ export async function middleware(request: NextRequest) {
         }
 
         // Role-based access control
-        if (pathname.startsWith('/admin') && profile.role !== 'ADMIN') {
+        const userRoles = profile.roles || [profile.role]
+
+        if (pathname.startsWith('/admin') && !userRoles.includes('ADMIN')) {
             // Redirect non-admin users to their appropriate dashboard
-            if (profile.role === 'TEACHER') {
+            if (userRoles.includes('TEACHER')) {
                 return NextResponse.redirect(new URL('/teacher', request.url))
-            } else if (profile.role === 'OFFICE') {
+            } else if (userRoles.includes('OFFICE')) {
                 return NextResponse.redirect(new URL('/office', request.url))
             }
         }
 
-        if (pathname.startsWith('/teacher') && profile.role !== 'TEACHER') {
+        if (pathname.startsWith('/teacher') && !userRoles.includes('TEACHER')) {
             // Redirect non-teacher users to their appropriate dashboard
-            if (profile.role === 'ADMIN') {
+            if (userRoles.includes('ADMIN')) {
                 return NextResponse.redirect(new URL('/admin', request.url))
-            } else if (profile.role === 'OFFICE') {
+            } else if (userRoles.includes('OFFICE')) {
                 return NextResponse.redirect(new URL('/office', request.url))
             }
         }
 
-        if (pathname.startsWith('/office') && profile.role !== 'OFFICE') {
+        if (pathname.startsWith('/office') && !userRoles.includes('OFFICE')) {
             // Redirect non-office users to their appropriate dashboard
-            if (profile.role === 'ADMIN') {
+            if (userRoles.includes('ADMIN')) {
                 return NextResponse.redirect(new URL('/admin', request.url))
-            } else if (profile.role === 'TEACHER') {
+            } else if (userRoles.includes('TEACHER')) {
                 return NextResponse.redirect(new URL('/teacher', request.url))
             }
         }

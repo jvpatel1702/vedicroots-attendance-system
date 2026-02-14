@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabaseClient';
+import { useOrganization } from '@/context/OrganizationContext';
 import { X, Save, ArrowRight, ArrowLeft, Trash2, Plus } from 'lucide-react';
 import { Steps } from '@/components/ui/steps';
 import { cn } from '@/lib/utils';
@@ -30,8 +31,9 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
     const [currentStep, setCurrentStep] = useState(1);
     const steps = ['Person Info', 'Student Details', 'Guardians', 'Enrollment'];
 
+    const { selectedOrganization } = useOrganization();
+
     // Metadata State
-    const [organizations, setOrganizations] = useState<{ id: string, name: string }[]>([]);
     const [locations, setLocations] = useState<{ id: string, name: string }[]>([]);
     const [classrooms, setClassrooms] = useState<Classroom[]>([]);
     const [grades, setGrades] = useState<Grade[]>([]);
@@ -56,7 +58,7 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
         guardians: [] as Guardian[],
 
         // Step 4: Enrollment
-        organizationId: '',
+        organizationId: '', // Will be set from context
         locationId: '',
         programId: '',
         gradeId: '',
@@ -79,20 +81,13 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
     });
     const [isAddingGuardian, setIsAddingGuardian] = useState(false);
 
-    // Initial Fetch
+    // Initial Fetch & Reset
     useEffect(() => {
-        if (isOpen) {
-            const fetchMeta = async () => {
-                const { data: orgs } = await supabase.from('organizations').select('id, name').order('name');
-                if (orgs) setOrganizations(orgs);
-            };
-            fetchMeta();
-
+        if (isOpen && selectedOrganization) {
             // Reset or Prefill
             setCurrentStep(1);
             if (student) {
                 // Edit Mode: Prefill
-                // Check if data is nested (from recent fetch) or flat (legacy/other sources)
                 const firstName = student.person?.first_name || student.first_name || '';
                 const lastName = student.person?.last_name || student.last_name || '';
                 const photoUrl = student.person?.photo_url || student.photo_url || '';
@@ -102,14 +97,15 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
                 updateData('photoUrl', photoUrl);
                 updateData('studentNumber', student.student_number);
 
-                // Map Medical Info
-                // Check if it's in a nested 'medical' object (new fetch) or flat
                 const medical = student.medical || student;
                 updateData('allergies', medical.allergies || '');
                 updateData('medicalConditions', medical.medical_conditions || '');
                 updateData('medications', medical.medications || '');
                 updateData('doctorName', medical.doctor_name || '');
                 updateData('doctorPhone', medical.doctor_phone || '');
+                updateData('organizationId', selectedOrganization.id);
+            } else {
+                // New Mode
                 setFormData({
                     firstName: '',
                     lastName: '',
@@ -122,7 +118,7 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
                     doctorName: '',
                     doctorPhone: '',
                     guardians: [],
-                    organizationId: '', // User must select
+                    organizationId: selectedOrganization.id,
                     locationId: '',
                     programId: '',
                     gradeId: '',
@@ -131,10 +127,10 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
                 });
             }
         }
-    }, [isOpen, student, supabase]);
+    }, [isOpen, student, selectedOrganization]);
 
 
-    // Fetch Locations and Grades when Org Changes
+    // Fetch Locations and Grades when Org Changes (or is set from context)
     useEffect(() => {
         if (!formData.organizationId) {
             setLocations([]);
@@ -499,21 +495,7 @@ export default function StudentForm({ student, isOpen, onClose, onSuccess }: Pro
                             <h4 className="text-lg font-semibold text-gray-800 border-l-4 border-brand-olive pl-3">Enrollment & Financials</h4>
 
                             <div className="grid grid-cols-1 gap-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Organization</label>
-                                    <select
-                                        value={formData.organizationId}
-                                        onChange={e => {
-                                            updateData('organizationId', e.target.value);
-                                            updateData('locationId', ''); // Reset downstream
-                                            updateData('classroomId', '');
-                                        }}
-                                        className="w-full border p-2 rounded-lg bg-white"
-                                    >
-                                        <option value="">Select Organization...</option>
-                                        {organizations.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                                    </select>
-                                </div>
+                                { /* Organization is now auto-selected from context */}
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
                                     <select

@@ -11,7 +11,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabaseClient';
-import { Plus, Edit, Calendar, FileSpreadsheet, Trash2, Users, CheckSquare, Square, X, GraduationCap, ExternalLink } from 'lucide-react';
+import { Plus, Edit, Calendar, FileSpreadsheet, Trash2, Users, CheckSquare, Square, X, GraduationCap, ExternalLink, Filter } from 'lucide-react';
 import Link from 'next/link';
 import StudentForm from '@/components/admin/StudentForm';
 import VacationModal from '@/components/admin/VacationModal';
@@ -52,6 +52,12 @@ interface Grade {
     name: string;
 }
 
+interface AcademicYear {
+    id: string;
+    name: string;
+    is_active: boolean;
+}
+
 export default function StudentsPage() {
     const supabase = createClient();
     const { selectedOrganization } = useOrganization();
@@ -59,6 +65,8 @@ export default function StudentsPage() {
     const [loading, setLoading] = useState(true);
     const [classrooms, setClassrooms] = useState<Classroom[]>([]);
     const [grades, setGrades] = useState<Grade[]>([]);
+    const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+    const [selectedYear, setSelectedYear] = useState<string>('');
 
     // Selection state
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -74,13 +82,44 @@ export default function StudentsPage() {
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);
     const [vacationStudent, setVacationStudent] = useState<Student | null>(null);
 
+    const fetchAcademicYears = useCallback(async () => {
+        const { data } = await supabase
+            .from('academic_years')
+            .select('*')
+            .order('start_date', { ascending: false });
+
+        if (data) {
+            setAcademicYears(data);
+            // Default to active year if no year selected
+            if (!selectedYear) {
+                const active = data.find(y => y.is_active);
+                if (active) setSelectedYear(active.id);
+            }
+        }
+    }, [supabase, selectedYear]);
+
     const fetchStudents = useCallback(async () => {
+        if (!selectedOrganization) return;
         setLoading(true);
-        const { data, error } = await supabase
+
+        // 1. Get classrooms for this organization to filter students
+        const { data: orgClassrooms } = await supabase
+            .from('classrooms')
+            .select('id')
+            .in('location_id', (
+                await supabase
+                    .from('locations')
+                    .select('id')
+                    .eq('organization_id', selectedOrganization.id)
+            ).data?.map(l => l.id) || []);
+
+        const classroomIds = orgClassrooms?.map(c => c.id) || [];
+
+        let query = supabase
             .from('students')
             .select(`
                 *,
-                person:persons (
+                person:persons!inner (
                     first_name,
                     last_name,
                     photo_url
@@ -92,14 +131,46 @@ export default function StudentsPage() {
                     doctor_name,
                     doctor_phone
                 ),
-                enrollments (
+                enrollments!inner (
                     status,
                     classroom_id,
                     grade_id,
+                    academic_year_id,
                     classrooms (id, name),
                     grades (id, name)
                 )
             `);
+
+        // Apply filters
+        if (classroomIds.length > 0) {
+            // We filter enrollments by organization's classrooms OR we can rely on the fact that an enrollment belongs to a classroom which belongs to a location...
+            // But 'enrollments!inner' filters the students. 
+            // Ideally we want students who have an enrollment in the selected year AND in a classroom belonging to this Org.
+        }
+
+        // Actually, let's refine the query.
+        // We want students valid for the selected Organization.
+        // That implies they have an enrollment in one of the organization's classrooms.
+
+        if (selectedYear) {
+            query = query.eq('enrollments.academic_year_id', selectedYear);
+        }
+
+        // We also need to filter by Organization. 
+        // Since Supabase filtering on inner joined tables can be tricky for "contains",
+        // we might best filter by checking if any of their enrollments match our classroom list.
+        // However, !inner on enrollments with a filter should work.
+
+        if (classroomIds.length > 0) {
+            query = query.in('enrollments.classroom_id', classroomIds);
+        } else {
+            // If organization has no classrooms, likely no students to show for this org
+            setStudents([]);
+            setLoading(false);
+            return;
+        }
+
+        const { data, error } = await query;
 
         if (error) {
             console.error('Error fetching students:', error);
@@ -142,10 +213,16 @@ export default function StudentsPage() {
     }, [supabase, selectedOrganization]);
 
     useEffect(() => {
-        fetchStudents();
+        fetchAcademicYears();
+    }, [fetchAcademicYears]);
+
+    useEffect(() => {
+        if (selectedYear) {
+            fetchStudents();
+        }
         fetchClassrooms();
         fetchGrades();
-    }, [fetchStudents, fetchClassrooms, fetchGrades]);
+    }, [fetchStudents, fetchClassrooms, fetchGrades, selectedYear]);
 
     const handleEdit = (student: Student) => {
         setEditingStudent(student);
@@ -299,6 +376,21 @@ export default function StudentsPage() {
                     <p className="text-gray-500 text-sm">Manage student enrollment and details.</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <div className="relative">
+                        <select
+                            value={selectedYear}
+                            onChange={(e) => setSelectedYear(e.target.value)}
+                            className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-3 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-gray-500"
+                        >
+                            <option value="">Select Year...</option>
+                            {academicYears.map(year => (
+                                <option key={year.id} value={year.id}>{year.name}</option>
+                            ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                            <Filter size={16} />
+                        </div>
+                    </div>
                     <button
                         onClick={() => setIsImportOpen(true)}
                         className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition-colors"
@@ -540,4 +632,3 @@ export default function StudentsPage() {
         </div>
     );
 }
-

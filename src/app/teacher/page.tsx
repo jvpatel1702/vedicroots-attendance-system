@@ -1,10 +1,10 @@
-'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import Link from 'next/link';
 import { ChevronRight, ClipboardCheck, Users, Calendar, BookOpen, AlertCircle } from 'lucide-react';
 import { useUser } from '@/lib/useUser';
+import ClockInWidget from '@/components/staff/ClockInWidget';
 
 interface Classroom {
     id: string;
@@ -26,6 +26,7 @@ export default function TeacherDashboard() {
     const [classes, setClasses] = useState<Classroom[]>([]);
     const [stats, setStats] = useState<TodayStats>({ totalStudents: 0, presentToday: 0, absentToday: 0, electiveClasses: 0 });
     const [dataLoading, setDataLoading] = useState(true);
+    const [staffId, setStaffId] = useState<string | null>(null);
     const today = new Date().toISOString().split('T')[0];
 
     const fetchData = useCallback(async () => {
@@ -41,62 +42,74 @@ export default function TeacherDashboard() {
             return;
         }
 
+
         if (user && !isDev) {
-            // Fetch classrooms
-            const { data: classData } = await supabase
-                .from('teacher_classrooms')
-                .select(`
-                    classrooms (
-                        id, name,
-                        enrollments(count)
-                    )
-                `)
-                .eq('teacher_id', user.id);
+            // 1. Get Staff ID
+            const { data: staffData } = await supabase
+                .from('staff')
+                .select('id')
+                .eq('user_id', user.id)
+                .single();
 
-            if (classData) {
-                const classroomIds = classData.map((item: any) => item.classrooms?.id).filter(Boolean);
+            if (staffData) {
+                setStaffId(staffData.id);
 
-                // Check which classes have attendance marked today
-                const { data: attendanceData } = await supabase
-                    .from('attendance')
-                    .select('student_id, students!inner(enrollments!inner(classroom_id))')
-                    .eq('date', today)
-                    .in('students.enrollments.classroom_id', classroomIds.length > 0 ? classroomIds : ['none']);
+                // Fetch classrooms using staff_id
+                const { data: classData } = await supabase
+                    .from('teacher_classrooms')
+                    .select(`
+                        classrooms (
+                            id, name,
+                            enrollments(count)
+                        )
+                    `)
+                    .eq('staff_id', staffData.id);
 
-                const markedClassrooms = new Set(
-                    attendanceData?.map((a: any) => a.students?.enrollments?.[0]?.classroom_id).filter(Boolean) || []
-                );
+                if (classData) {
+                    const classroomIds = classData.map((item: any) => item.classrooms?.id).filter(Boolean);
 
-                const formatted = classData.map((item: any) => {
-                    const cls = item.classrooms;
-                    return {
-                        id: cls.id,
-                        name: cls.name,
-                        studentCount: cls.enrollments?.[0]?.count || 0,
-                        attendanceMarked: markedClassrooms.has(cls.id)
-                    };
-                });
-                setClasses(formatted);
+                    // Check which classes have attendance marked today
+                    const { data: attendanceData } = await supabase
+                        .from('attendance')
+                        .select('student_id, students!inner(enrollments!inner(classroom_id))')
+                        .eq('date', today)
+                        .in('students.enrollments.classroom_id', classroomIds.length > 0 ? classroomIds : ['none']);
 
-                // Calculate stats
-                const totalStudents = formatted.reduce((sum, c) => sum + c.studentCount, 0);
-                const presentCount = attendanceData?.filter((a: any) => a.status === 'PRESENT').length || 0;
-                const absentCount = attendanceData?.filter((a: any) => a.status === 'ABSENT').length || 0;
+                    const markedClassrooms = new Set(
+                        attendanceData?.map((a: any) => a.students?.enrollments?.[0]?.classroom_id).filter(Boolean) || []
+                    );
 
-                // Get elective count
-                const { count: electiveCount } = await supabase
-                    .from('elective_offerings')
-                    .select('id', { count: 'exact' })
-                    .eq('teacher_id', user.id);
+                    const formatted = classData.map((item: any) => {
+                        const cls = item.classrooms;
+                        return {
+                            id: cls.id,
+                            name: cls.name,
+                            studentCount: cls.enrollments?.[0]?.count || 0,
+                            attendanceMarked: markedClassrooms.has(cls.id)
+                        };
+                    });
+                    setClasses(formatted);
 
-                setStats({
-                    totalStudents,
-                    presentToday: presentCount,
-                    absentToday: absentCount,
-                    electiveClasses: electiveCount || 0
-                });
+                    // Calculate stats
+                    const totalStudents = formatted.reduce((sum, c) => sum + c.studentCount, 0);
+                    const presentCount = attendanceData?.filter((a: any) => a.status === 'PRESENT').length || 0;
+                    const absentCount = attendanceData?.filter((a: any) => a.status === 'ABSENT').length || 0;
+
+                    // Get elective count
+                    const { count: electiveCount } = await supabase
+                        .from('elective_offerings')
+                        .select('id', { count: 'exact' })
+                        .eq('teacher_id', user.id);
+
+                    setStats({
+                        totalStudents,
+                        presentToday: presentCount,
+                        absentToday: absentCount,
+                        electiveClasses: electiveCount || 0
+                    });
+                }
+                setDataLoading(false);
             }
-            setDataLoading(false);
         }
     }, [user, loading, isDev, supabase, today]);
 
@@ -116,6 +129,13 @@ export default function TeacherDashboard() {
 
     return (
         <div className="space-y-6">
+            {/* Clock In Widget */}
+            {staffId && (
+                <div className="mb-6">
+                    <ClockInWidget staffId={staffId} />
+                </div>
+            )}
+
             {/* Welcome Banner */}
             <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">
                 <h2 className="text-2xl font-bold">Welcome back!</h2>

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LucideIcon, Leaf } from 'lucide-react';
+import DashboardSwitcher from './DashboardSwitcher';
 
 interface SidebarItem {
     title: string;
@@ -36,7 +37,9 @@ export default function Sidebar({ items, organizationType }: SidebarProps) {
                     </div>
                     <div>
                         <h1 className="text-lg font-bold text-gray-900">Vedic Roots</h1>
-                        <p className="text-xs text-gray-500">Admin Portal</p>
+                        <div className="mt-1">
+                            <DashboardSwitcher />
+                        </div>
                     </div>
                 </div>
             </div>
