@@ -1,7 +1,0 @@
-{
-  "name": "EduTrack Attendance System",
-  "description": "A mobile-first school attendance platform for teachers with a comprehensive administrative dashboard for managing students, schedules, and vacations.",
-  "requestFramePermissions": [
-    "camera"
-  ]
-}
