@@ -8,6 +8,15 @@ import { OrganizationProvider, useOrganization } from '@/context/OrganizationCon
 import { navItems } from '@/config/navigation';
 import Sidebar from '@/components/Sidebar';
 
+/**
+ * Inner layout content for the Admin section.
+ * 
+ * Handles:
+ * - User role verification (via Auth or Dev Cookie).
+ * - Navigation filtering based on role.
+ * - Sidebar rendering.
+ * - Organization switcher in the header.
+ */
 function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const supabase = createClient();
@@ -148,6 +157,12 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     );
 }
 
+/**
+ * The main layout for the Admin Dashboard.
+ * 
+ * Wraps the content with the `OrganizationProvider` to ensure organization context
+ * is available throughout the admin pages.
+ */
 export default function AdminLayout({
     children,
 }: {

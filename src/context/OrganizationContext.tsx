@@ -10,15 +10,28 @@ export interface Organization {
     logo_url?: string;
 }
 
+/**
+ * The shape of the Organization Context data.
+ */
 interface OrganizationContextType {
+    /** List of all organizations available to the user */
     organizations: Organization[];
+    /** The currently selected organization */
     selectedOrganization: Organization | null;
+    /** Function to update the selected organization */
     setSelectedOrganization: (org: Organization) => void;
+    /** Loading state for fetching organizations */
     isLoading: boolean;
 }
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined);
 
+/**
+ * Context Provider for Organization data.
+ * 
+ * Fetches the list of organizations from Supabase and manages the selected organization state.
+ * It also persists the selected organization ID in localStorage.
+ */
 export function OrganizationProvider({ children }: { children: ReactNode }) {
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [selectedOrganization, setSelectedOrganization] = useState<Organization | null>(null);
@@ -76,6 +89,12 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     );
 }
 
+/**
+ * Custom hook to access the Organization Context.
+ * 
+ * @returns The organization context data.
+ * @throws Error if used outside of an OrganizationProvider.
+ */
 export function useOrganization() {
     const context = useContext(OrganizationContext);
     if (context === undefined) {

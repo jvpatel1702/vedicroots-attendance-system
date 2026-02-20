@@ -2,6 +2,11 @@
 
 import { createClient } from '@/lib/supabase/server'
 
+/**
+ * Fetches all user profiles ordered by name.
+ * 
+ * @returns A list of all profiles.
+ */
 export async function getProfiles() {
     const supabase = await createClient()
     const { data, error } = await supabase
@@ -13,6 +18,11 @@ export async function getProfiles() {
     return data
 }
 
+/**
+ * Fetches all profiles with the 'TEACHER' role.
+ * 
+ * @returns A list of teacher profiles.
+ */
 export async function getTeachers() {
     const supabase = await createClient()
     const { data, error } = await supabase

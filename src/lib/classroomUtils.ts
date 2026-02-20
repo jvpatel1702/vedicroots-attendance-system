@@ -2,18 +2,30 @@ import { isWithinInterval, parseISO } from 'date-fns';
 
 export interface StudentVacation {
     student_id: string;
-    start_date: string; // YYYY-MM-DD
-    end_date: string;   // YYYY-MM-DD
+    /** Start date of the vacation in YYYY-MM-DD format */
+    start_date: string;
+    /** End date of the vacation in YYYY-MM-DD format */
+    end_date: string;
 }
 
 export interface SchoolHoliday {
     id?: string;
     organization_id: string;
     name: string;
-    start_date: string; // YYYY-MM-DD
-    end_date: string;   // YYYY-MM-DD
+    /** Start date of the holiday in YYYY-MM-DD format */
+    start_date: string;
+    /** End date of the holiday in YYYY-MM-DD format */
+    end_date: string;
 }
 
+/**
+ * Checks if a specific student is on vacation for a given date.
+ * 
+ * @param studentId - The ID of the student to check.
+ * @param vacations - List of all student vacations.
+ * @param date - The date to check (defaults to today).
+ * @returns True if the student is on vacation, false otherwise.
+ */
 export function isStudentOnVacation(
     studentId: string,
     vacations: StudentVacation[],
@@ -28,6 +40,13 @@ export function isStudentOnVacation(
     });
 }
 
+/**
+ * Checks if a given date falls within any school holiday.
+ * 
+ * @param date - The date to check.
+ * @param holidays - List of school holidays.
+ * @returns The holiday object if found, otherwise null.
+ */
 export function isDateHoliday(
     date: Date,
     holidays: SchoolHoliday[]

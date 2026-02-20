@@ -17,14 +17,27 @@ import {
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 
+/**
+ * Represents a navigation item in the sidebar.
+ */
 export interface NavItem {
+    /** The title of the navigation item displayed to the user */
     title: string;
+    /** The URL path the item links to */
     href: string;
+    /** The icon component to display */
     icon: LucideIcon;
-    roles: string[]; // Role based access: ['ADMIN', 'TEACHER', 'OFFICE']
-    organizationTypes?: string[]; // Optional: filter by organization type
+    /** List of user roles allowed to see this item (e.g., 'ADMIN', 'TEACHER') */
+    roles: string[];
+    /** Optional list of organization types to filter visibility (e.g., 'SCHOOL') */
+    organizationTypes?: string[];
 }
 
+/**
+ * The main configuration for the sidebar navigation.
+ * 
+ * Defines the links, icons, and access control for each menu item.
+ */
 export const navItems: NavItem[] = [
     {
         title: 'Dashboard',

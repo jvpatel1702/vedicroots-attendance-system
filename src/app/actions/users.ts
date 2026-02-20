@@ -37,6 +37,14 @@ async function ensureAdmin() {
     return user;
 }
 
+/**
+ * Creates a new user with Supabase Auth and a corresponding profile.
+ * 
+ * Requires ADMIN privileges.
+ * 
+ * @param data - The user data (email, name, roles, password).
+ * @returns The created user object.
+ */
 export async function createUser(data: {
     email: string;
     password?: string;
@@ -79,6 +87,14 @@ export async function createUser(data: {
     return { success: true, user: authUser.user };
 }
 
+/**
+ * Updates an existing user's profile and/or password.
+ * 
+ * Requires ADMIN privileges.
+ * 
+ * @param id - The ID of the user to update.
+ * @param data - The fields to update (name, roles, password).
+ */
 export async function updateUser(id: string, data: {
     name?: string;
     roles?: string[];
@@ -116,6 +132,13 @@ export async function updateUser(id: string, data: {
     return { success: true };
 }
 
+/**
+ * Deletes a user by ID.
+ * 
+ * Requires ADMIN privileges.
+ * 
+ * @param id - The ID of the user to delete.
+ */
 export async function deleteUser(id: string) {
     await ensureAdmin();
     const supabaseAdmin = await createAdminClient();

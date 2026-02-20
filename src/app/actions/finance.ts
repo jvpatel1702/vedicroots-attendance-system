@@ -7,6 +7,16 @@ import { revalidatePath } from 'next/cache'
 // 1. Calculating Teacher Pay based on fulfilled sessions.
 // 2. Calculating Student "Rollovers" or "Credits" based on cancelled sessions.
 
+/**
+ * Calculates the total pay for a teacher over a specific period.
+ * 
+ * Based on the number of non-cancelled elective sessions directed by the teacher.
+ * 
+ * @param teacherId - The ID of the teacher.
+ * @param startDate - Start date of the period.
+ * @param endDate - End date of the period.
+ * @returns Total pay amount and a breakdown by offering.
+ */
 export async function calculateTeacherPay(teacherId: string, startDate: string, endDate: string) {
     const supabase = await createClient()
 
@@ -99,6 +109,14 @@ export async function calculateTeacherPay(teacherId: string, startDate: string, 
     return { totalPay, breakdown }
 }
 
+/**
+ * Fetches all "rollover" credits for a student.
+ * 
+ * Rollovers occur when a class is cancelled (Teacher Absent) or explicitly marked as rollover.
+ * 
+ * @param studentId - The ID of the student.
+ * @returns A list of attendance records qualifying for rollover.
+ */
 export async function getStudentRollovers(studentId: string) {
     const supabase = await createClient()
 

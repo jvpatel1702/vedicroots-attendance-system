@@ -21,6 +21,9 @@ type CreateOfferingData = {
 
 // --- Subjects ---
 
+/**
+ * Fetches all available elective subjects.
+ */
 export async function getElectiveSubjects() {
     const supabase = await createClient()
     const { data, error } = await supabase
@@ -32,6 +35,9 @@ export async function getElectiveSubjects() {
     return data
 }
 
+/**
+ * Creates a new elective subject.
+ */
 export async function createElectiveSubject(formData: FormData) {
     const supabase = await createClient()
     const name = formData.get('name') as string
@@ -48,6 +54,9 @@ export async function createElectiveSubject(formData: FormData) {
 
 // --- Offerings ---
 
+/**
+ * Fetches elective offerings, optionally filtered by academic year.
+ */
 export async function getElectiveOfferings(academicYearId?: string) {
     const supabase = await createClient()
     let query = supabase
@@ -68,6 +77,9 @@ export async function getElectiveOfferings(academicYearId?: string) {
     return data
 }
 
+/**
+ * Creates a new elective offering and generates its initial class sessions.
+ */
 export async function createElectiveOffering(data: CreateOfferingData) {
     const supabase = await createClient()
 
@@ -155,6 +167,9 @@ export async function generateClassSessions(offeringId: string) {
     }
 }
 
+/**
+ * Fetches all scheduled classes for a specific offering.
+ */
 export async function getElectiveClasses(offeringId: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
@@ -187,6 +202,9 @@ export async function updateClassSession(classId: string, updates: {
 
 // --- Enrollments ---
 
+/**
+ * Fetches all students enrolled in a specific elective offering.
+ */
 export async function getElectiveEnrollments(offeringId: string) {
     const supabase = await createClient()
     const { data, error } = await supabase
@@ -202,6 +220,9 @@ export async function getElectiveEnrollments(offeringId: string) {
     return data
 }
 
+/**
+ * Enrolls a student in an elective offering.
+ */
 export async function enrollStudentInElective(studentId: string, offeringId: string, startDate: string) {
     const supabase = await createClient()
     const { error } = await supabase
@@ -234,6 +255,11 @@ export async function getTeacherElectiveOfferings(teacherId: string) {
     return data
 }
 
+/**
+ * Generates the attendance sheet data for a specific elective class session.
+ * 
+ * Combines enrollment data, existing attendance records, and school-wide attendance status.
+ */
 export async function getElectiveAttendanceSheet(offeringId: string, date: string) {
     const supabase = await createClient()
 
@@ -301,6 +327,11 @@ export async function getElectiveAttendanceSheet(offeringId: string, date: strin
     })
 }
 
+/**
+ * Marks attendance for multiple students in an elective class.
+ * 
+ * Resolves enrollment IDs to student and class IDs before upserting attendance records.
+ */
 export async function markElectiveAttendance(payload: {
     enrollment_id: string,
     date: string,
@@ -359,6 +390,9 @@ export async function markElectiveAttendance(payload: {
     revalidatePath('/teacher/electives')
 }
 
+/**
+ * Fetches attendance data for a specific class instance.
+ */
 export async function getElectiveClassAttendance(classId: string) {
     const supabase = await createClient()
 

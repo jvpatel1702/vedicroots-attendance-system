@@ -9,17 +9,31 @@ interface Student {
     first_name: string;
     last_name: string;
     profile_picture?: string;
+    /** Current attendance status (PRESENT, ABSENT, LATE, or null) */
     status?: string | null;
+    /** Time of arrival if marked LATE */
     arrival_time?: string;
 }
 
 interface Props {
+    /** The student object to display */
     student: Student;
+    /** Callback function when the student is marked */
     onMark: (id: string, status: 'PRESENT' | 'ABSENT' | 'LATE') => void;
+    /** Whether the current time is past the attendance cutoff */
     isPastCutoff: boolean;
+    /** If true, disables the swipe interaction */
     disabled?: boolean;
 }
 
+/**
+ * A list item component that supports swipe gestures for marking attendance.
+ * 
+ * - Swipe Right: Mark PRESENT (or LATE if past cutoff).
+ * - Swipe Left: Mark ABSENT.
+ * 
+ * Visual feedback is provided during the swipe action.
+ */
 export default function SwipeableStudentItem({ student, onMark, isPastCutoff, disabled }: Props) {
     const [offsetX, setOffsetX] = useState(0);
     const [isDragging, setIsDragging] = useState(false);

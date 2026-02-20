@@ -8,6 +8,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AbsentStudentsCard, PresentEmployeesCard, NewAdmissionsCard } from '@/components/admin/DashboardWidgets';
 import { useOrganization } from '@/context/OrganizationContext';
 
+/**
+ * The main Admin Dashboard Overview page.
+ * 
+ * Aggregates and displays key metrics for the selected organization:
+ * - Total Active Students and Staff.
+ * - Daily Attendance Stats (Present, Absent, Late).
+ * - List of Absent Students.
+ * - List of Present Staff.
+ * - Recent/Upcoming Admissions.
+ * - Today's Holiday Status.
+ */
 export default function AdminDashboard() {
     const supabase = createClient();
     const { selectedOrganization, isLoading: isOrgLoading } = useOrganization();

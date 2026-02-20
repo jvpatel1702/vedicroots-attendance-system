@@ -6,9 +6,20 @@ import { User } from '@supabase/supabase-js';
 export interface AppUser extends Partial<User> {
     id: string;
     email?: string;
+    /** The role of the user (e.g., 'ADMIN', 'TEACHER', 'OFFICE') */
     role?: string;
 }
 
+/**
+ * Custom hook to fetch and provide the current user's authentication state.
+ * 
+ * This hook handles:
+ * - Fetching the user from Supabase Auth.
+ * - Simulating a development user if a 'dev_role' cookie is present.
+ * - Managing loading state.
+ * 
+ * @returns An object containing the user object, loading state, and dev mode flag.
+ */
 export function useUser() {
     const [user, setUser] = useState<AppUser | null>(null);
     const [loading, setLoading] = useState(true);

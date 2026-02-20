@@ -3,12 +3,19 @@ import { isAfter } from 'date-fns';
 export type GradeType = 'KINDERGARTEN' | 'ELEMENTARY';
 
 export interface SchoolSettings {
+    /** Time when kindergarten attendance marking is cut off (format: "HH:MM:SS") */
     cutoff_time_kg: string;        // "09:15:00"
+    /** Time when elementary attendance marking is cut off (format: "HH:MM:SS") */
     cutoff_time_elementary: string; // "09:00:00"
 }
 
 /**
- * Checks if the current time is past the cutoff for the given grade type.
+ * Checks if the current time is past the allowed attendance cutoff time for a specific grade.
+ * 
+ * @param gradeType - The grade level to check (KINDERGARTEN or ELEMENTARY).
+ * @param settings - The school settings containing cutoff times.
+ * @param currentTime - The time to check against (defaults to now).
+ * @returns True if the current time is past the cutoff time, false otherwise.
  */
 export function isPastCutoff(
     gradeType: GradeType,
@@ -30,7 +37,12 @@ export function isPastCutoff(
 }
 
 /**
- * Determines allowed actions based on time logic.
+ * Determines which attendance actions are allowed based on the current time and grade level.
+ * 
+ * @param gradeType - The grade level (KINDERGARTEN or ELEMENTARY).
+ * @param settings - The school settings containing cutoff times.
+ * @param currentTime - The current time (defaults to now).
+ * @returns An object indicating whether marking Present, Absent, or Late is allowed.
  */
 export function getAllowedAttendanceActions(
     gradeType: GradeType,

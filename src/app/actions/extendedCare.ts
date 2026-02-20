@@ -47,6 +47,19 @@ interface CalculationResult {
 const dayMap: { [key: string]: string } = { 'Mon': 'MONDAY', 'Tue': 'TUESDAY', 'Wed': 'WEDNESDAY', 'Thu': 'THURSDAY', 'Fri': 'FRIDAY' };
 const dayIndexMap: { [key: string]: number } = { 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5 };
 
+/**
+ * Calculates the extended care fee for a student for a specific month.
+ * 
+ * This complex function handles:
+ * 1. Determining applicable rates and cutoff times based on grade (Kindergarten vs Elementary).
+ * 2. Calculating billable cycles (30-min blocks) before drop-off and after pick-up.
+ * 3. Prorating fees based on the number of working days in the month vs remaining working days.
+ * 4. Deducting time for conflicting activities (Electives, Taxi).
+ * 5. Applying sibling discounts (if implied by logic, though mostly activity deductions here).
+ * 
+ * @param req - The calculation request parameters.
+ * @returns The detailed calculation result including breakdown and final fee.
+ */
 export async function calculateExtendedCareFee(req: CalculationRequest): Promise<CalculationResult> {
     const supabase = await createClient();
     console.log('Calculating Extended Care Fee for:', req.organizationId);
@@ -322,6 +335,11 @@ export async function calculateExtendedCareFee(req: CalculationRequest): Promise
     };
 }
 
+/**
+ * Saves the extended care enrollment and fee information.
+ * 
+ * First recalculates the fee to ensure data integrity, then upserts the record.
+ */
 export async function saveExtendedCareEnrollment(req: CalculationRequest & { manualAdjustmentReason?: string }) {
     const supabase = await createClient();
     const calc = await calculateExtendedCareFee(req);

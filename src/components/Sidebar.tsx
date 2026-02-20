@@ -6,17 +6,29 @@ import { LucideIcon, Leaf } from 'lucide-react';
 import DashboardSwitcher from './DashboardSwitcher';
 
 interface SidebarItem {
+    /** The title of the sidebar item */
     title: string;
+    /** The URL path the item links to */
     href: string;
+    /** The icon component to display */
     icon: LucideIcon;
+    /** Optional list of organization types to filter visibility */
     organizationTypes?: string[];
 }
 
 interface SidebarProps {
+    /** List of navigation items to display in the sidebar */
     items: SidebarItem[];
+    /** The type of the current organization (used for filtering items) */
     organizationType?: string;
 }
 
+/**
+ * Sidebar component for the application.
+ * 
+ * Displays the application logo, dashboard switcher, and a list of navigation links.
+ * It filters the navigation items based on the current organization type.
+ */
 export default function Sidebar({ items, organizationType }: SidebarProps) {
     const pathname = usePathname();
 

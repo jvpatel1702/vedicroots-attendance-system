@@ -3,6 +3,12 @@
 import { createClient } from '@/lib/supabase/server';
 import { SchoolHoliday } from '@/lib/classroomUtils';
 
+/**
+ * Fetches all school holidays for a specific organization.
+ * 
+ * @param organizationId - The ID of the organization.
+ * @returns A list of school holidays ordered by start date.
+ */
 export async function getHolidays(organizationId: string) {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -15,6 +21,12 @@ export async function getHolidays(organizationId: string) {
     return data as SchoolHoliday[];
 }
 
+/**
+ * Saves (creates or updates) a school holiday.
+ * 
+ * @param holiday - The holiday object to save.
+ * @returns The saved holiday object.
+ */
 export async function saveHoliday(holiday: SchoolHoliday) {
     const supabase = await createClient();
 
@@ -49,6 +61,12 @@ export async function saveHoliday(holiday: SchoolHoliday) {
     return data[0] as SchoolHoliday;
 }
 
+/**
+ * Deletes a school holiday by ID.
+ * 
+ * @param id - The ID of the holiday to delete.
+ * @returns True if successful.
+ */
 export async function deleteHoliday(id: string) {
     const supabase = await createClient();
     const { error } = await supabase

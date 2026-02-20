@@ -1,6 +1,12 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 
+/**
+ * The landing page of the application.
+ * 
+ * It acts as a routing controller, checking the user's authentication state and role
+ * to redirect them to the appropriate dashboard (Admin, Teacher, Office) or Login page.
+ */
 export default async function Home() {
     const supabase = await createClient();
 

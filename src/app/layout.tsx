@@ -19,6 +19,11 @@ export const viewport: Viewport = {
     userScalable: false,
 };
 
+/**
+ * The root layout for the entire application.
+ * 
+ * Applies global styles, font settings (Inter), and global providers like Toaster.
+ */
 export default function RootLayout({
     children,
 }: {

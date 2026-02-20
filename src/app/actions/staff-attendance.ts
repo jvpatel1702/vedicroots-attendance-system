@@ -11,6 +11,11 @@ const determineStatus = (checkInTime: string, scheduledStartTime: string): strin
     return 'PRESENT';
 };
 
+/**
+ * Clocks in a staff member.
+ * 
+ * Checks for existing clock-ins, verifies active status, and links to the current pay period.
+ */
 export async function clockIn(staffId: string, locationData?: { lat: number, lng: number }) {
     const supabase = await createClient();
 
@@ -86,6 +91,11 @@ export async function clockIn(staffId: string, locationData?: { lat: number, lng
     return { success: true, message: 'Clocked in successfully' };
 }
 
+/**
+ * Clocks out a staff member.
+ * 
+ * Calculates duration and applies break logic (deduct 30 mins if > 5.5 hours).
+ */
 export async function clockOut(staffId: string, locationData?: { lat: number, lng: number }) {
     const supabase = await createClient();
     const today = new Date().toISOString().split('T')[0];
@@ -142,6 +152,9 @@ export async function clockOut(staffId: string, locationData?: { lat: number, ln
     return { success: true, message: 'Clocked out successfully' };
 }
 
+/**
+ * Gets the clock-in status for a staff member for today.
+ */
 export async function getTodayStatus(staffId: string) {
     const supabase = await createClient();
     const today = new Date().toISOString().split('T')[0];
@@ -160,6 +173,9 @@ export async function getTodayStatus(staffId: string) {
     return { success: true, record: data };
 }
 
+/**
+ * Fetches all attendance records for a staff member within a specific pay period.
+ */
 export async function getPayPeriodAttendance(staffId: string, payPeriodId: string) {
     const supabase = await createClient();
 

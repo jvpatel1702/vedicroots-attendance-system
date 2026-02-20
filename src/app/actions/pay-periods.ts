@@ -3,6 +3,13 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
+/**
+ * Generates and saves pay periods for a given year and frequency.
+ * 
+ * @param organizationId - The organization ID.
+ * @param year - The year to generate periods for.
+ * @param frequency - 'WEEKLY', 'BIWEEKLY', or 'MONTHLY'.
+ */
 export async function createPayPeriods(organizationId: string, year: number, frequency: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY') {
     const supabase = await createClient();
 
@@ -57,6 +64,9 @@ export async function createPayPeriods(organizationId: string, year: number, fre
     return { success: true, message: `Created ${periods.length} pay periods for ${year}` };
 }
 
+/**
+ * Fetches all pay periods for an organization.
+ */
 export async function getPayPeriods(organizationId: string) {
     const supabase = await createClient();
     const { data, error } = await supabase
@@ -69,6 +79,9 @@ export async function getPayPeriods(organizationId: string) {
     return { success: true, data };
 }
 
+/**
+ * Gets the current active pay period based on today's date.
+ */
 export async function getCurrentPayPeriod(organizationId: string) {
     const supabase = await createClient();
     const today = new Date().toISOString().split('T')[0];

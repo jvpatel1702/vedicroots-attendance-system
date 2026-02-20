@@ -6,10 +6,15 @@ import { useRouter, usePathname } from 'next/navigation';
 import { ChevronDown, Shield, GraduationCap, Building, Users } from 'lucide-react';
 
 interface DashboardOption {
+    /** The user role associated with this dashboard */
     role: string;
+    /** The display label for the dashboard in the switcher */
     label: string;
+    /** The base path for the dashboard */
     path: string;
+    /** The icon to display for the dashboard option */
     icon: React.ReactNode;
+    /** Tailwind CSS color class for the icon */
     color: string;
 }
 
@@ -20,6 +25,12 @@ const DASHBOARD_OPTIONS: DashboardOption[] = [
     { role: 'PARENT', label: 'Parent Portal', path: '/parent', icon: <Users size={16} />, color: 'text-purple-600' },
 ];
 
+/**
+ * Component to switch between different dashboards based on user roles.
+ * 
+ * It displays a dropdown menu allowing users with multiple roles to navigate 
+ * between their available dashboards (e.g., Admin, Teacher, Office).
+ */
 export default function DashboardSwitcher() {
     const supabase = createClient();
     const router = useRouter();
