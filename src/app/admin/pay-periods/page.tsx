@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { useOrganization } from '@/context/OrganizationContext';
 import { Loader2, Plus, Calendar, Check, Lock, AlertTriangle } from 'lucide-react';
-import { createPayPeriods, getPayPeriods } from '@/app/actions/pay-periods';
+import { createPayPeriods, getPayPeriods } from '@/lib/actions/pay-periods';
 
 export default function PayPeriodsPage() {
     const { selectedOrganization } = useOrganization();

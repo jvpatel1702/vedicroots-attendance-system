@@ -1,11 +1,18 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabaseClient';
+/**
+ * Staff Management Page
+ * ---------------------
+ * Uses TanStack Query (useStaff) with queryClient.invalidateQueries for mutation refresh.
+ */
+
+import { useState } from 'react';
 import { Plus, Edit, Eye } from 'lucide-react';
 import Link from 'next/link';
 import StaffForm from '@/components/admin/StaffForm';
 import { useOrganization } from '@/context/OrganizationContext';
+import { useStaff } from '@/lib/queries';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface TeacherClassroom {
     classrooms: { name: string } | null;
@@ -21,51 +28,11 @@ interface StaffProfile {
 }
 
 export default function StaffPage() {
-    const supabase = createClient();
     const { selectedOrganization } = useOrganization();
-    const [staffMembers, setStaffMembers] = useState<StaffProfile[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
+    const { data: staffMembers = [], isLoading } = useStaff(selectedOrganization?.id);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingStaff, setEditingStaff] = useState<StaffProfile | null>(null);
-
-    const fetchStaff = useCallback(async () => {
-        if (!selectedOrganization) return;
-        setLoading(true);
-        // Fetch ALL staff filtered by organization
-        const { data: staffList } = await supabase
-            .from('staff')
-            .select(`
-                id,
-                email,
-                role,
-                user_id,
-                persons!inner(first_name, last_name, organization_id),
-                teacher_classrooms (
-                    classrooms (name)
-                )
-            `)
-            .eq('persons.organization_id', selectedOrganization.id)
-            .order('role');
-
-        if (staffList) {
-            const mappedStaff: StaffProfile[] = (staffList as any[]).filter(s => s.persons).map((s: any) => ({
-                id: s.id,
-                name: s.persons ? `${s.persons.first_name} ${s.persons.last_name}` : 'Unknown',
-                email: s.email || '',
-                role: s.role,
-                user_id: s.user_id,
-                teacher_classrooms: s.teacher_classrooms
-            }));
-            setStaffMembers(mappedStaff);
-        }
-        setLoading(false);
-    }, [supabase, selectedOrganization]);
-
-    useEffect(() => {
-        if (selectedOrganization) {
-            fetchStaff();
-        }
-    }, [fetchStaff, selectedOrganization]);
 
     const handleEdit = (staff: StaffProfile) => {
         setEditingStaff(staff);
@@ -75,6 +42,11 @@ export default function StaffPage() {
     const handleAdd = () => {
         setEditingStaff(null);
         setIsFormOpen(true);
+    };
+
+    const handleSuccess = () => {
+        // Invalidate the staff query so the list refreshes automatically
+        queryClient.invalidateQueries({ queryKey: ['staff', selectedOrganization?.id] });
     };
 
     return (
@@ -104,12 +76,12 @@ export default function StaffPage() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                        {loading ? (
+                        {isLoading ? (
                             <tr><td colSpan={5} className="p-8 text-center text-gray-400">Loading staff...</td></tr>
                         ) : staffMembers.length === 0 ? (
                             <tr><td colSpan={5} className="p-8 text-center text-gray-400">No staff found.</td></tr>
                         ) : (
-                            staffMembers.map(staff => (
+                            (staffMembers as StaffProfile[]).map(staff => (
                                 <tr key={staff.id} className="hover:bg-gray-50 group transition-colors">
                                     <td className="px-6 py-4 font-semibold text-gray-900">
                                         <Link href={`/admin/staff/${staff.id}`} className="hover:text-indigo-600 hover:underline">
@@ -175,7 +147,7 @@ export default function StaffPage() {
                 isOpen={isFormOpen}
                 onClose={() => setIsFormOpen(false)}
                 teacher={editingStaff}
-                onSuccess={fetchStaff}
+                onSuccess={handleSuccess}
             />
         </div>
     );

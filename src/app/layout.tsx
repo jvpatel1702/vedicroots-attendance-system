@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Toaster } from 'sonner';
+import QueryProvider from '@/providers/QueryProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -22,7 +23,9 @@ export const viewport: Viewport = {
 /**
  * The root layout for the entire application.
  * 
- * Applies global styles, font settings (Inter), and global providers like Toaster.
+ * Applies global styles, font settings (Inter), and global providers:
+ *  - QueryProvider: TanStack Query for data fetching across the entire app
+ *  - Toaster: Global toast notifications
  */
 export default function RootLayout({
     children,
@@ -32,7 +35,9 @@ export default function RootLayout({
     return (
         <html lang="en" suppressHydrationWarning>
             <body className={inter.className}>
-                {children}
+                <QueryProvider>
+                    {children}
+                </QueryProvider>
                 <Toaster richColors position="top-center" />
             </body>
         </html>

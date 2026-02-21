@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { useOrganization } from '@/context/OrganizationContext';
-import { createUser } from '@/app/actions/users';
+import { createUser } from '@/lib/actions/users';
 import { X, Save, UserPlus, Key } from 'lucide-react';
 
 interface Props {

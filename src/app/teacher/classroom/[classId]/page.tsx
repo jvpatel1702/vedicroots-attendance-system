@@ -4,7 +4,6 @@ import { useEffect, useState, use, useCallback } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { Save, Info, Loader2, Calendar } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@/lib/useUser';
 import { isPastCutoff, GradeType, SchoolSettings } from '@/lib/attendanceTime';
 import { isStudentOnVacation, StudentVacation, SchoolHoliday } from '@/lib/classroomUtils';
 import SwipeableStudentItem from '@/components/SwipeableStudentItem';
@@ -26,7 +25,7 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
     const params = use(props.params);
     const classId = params.classId;
     const supabase = createClient();
-    const { isDev } = useUser();
+
 
     // State
     const [students, setStudents] = useState<Student[]>([]);
@@ -56,68 +55,55 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                 cutoff_time_elementary: '09:00:00'
             };
 
-            if (!isDev) {
-                const { data: settingsData } = await supabase.from('school_settings').select('*').single();
-                if (settingsData) {
-                    currentSettings = {
-                        // Use new separate columns, with fallback to old cutoff_time for backwards compatibility
-                        cutoff_time_kg: settingsData.cutoff_time_kg || settingsData.cutoff_time || '09:15:00',
-                        cutoff_time_elementary: settingsData.cutoff_time_elementary || settingsData.cutoff_time || '09:00:00'
-                    };
-                }
+            const { data: settingsData } = await supabase.from('school_settings').select('*').single();
+            if (settingsData) {
+                currentSettings = {
+                    cutoff_time_kg: settingsData.cutoff_time_kg || settingsData.cutoff_time || '09:15:00',
+                    cutoff_time_elementary: settingsData.cutoff_time_elementary || settingsData.cutoff_time || '09:00:00'
+                };
+            }
 
-                // Fetch Today's Holiday
-                const { data: holidayData } = await supabase
-                    .from('school_holidays')
-                    .select('*')
-                    .lte('start_date', date)
-                    .gte('end_date', date);
+            // Fetch Today's Holiday
+            const { data: holidayData } = await supabase
+                .from('school_holidays')
+                .select('*')
+                .lte('start_date', date)
+                .gte('end_date', date);
 
-                if (holidayData && holidayData.length > 0) {
-                    setTodayHoliday(holidayData[0] as SchoolHoliday);
-                }
+            if (holidayData && holidayData.length > 0) {
+                setTodayHoliday(holidayData[0] as SchoolHoliday);
             }
             setSettings(currentSettings);
 
             // 2. Fetch Class Info and Grade Type via Programs
             let currentGradeType: GradeType = 'ELEMENTARY';
 
-            if (!isDev) {
-                // New Query for deep linking
-                const { data: gradeData } = await supabase
-                    .from('classroom_grades')
-                    .select(`
-                        grades (
-                            program_id,
-                            programs (
-                                name
-                            )
+            const { data: gradeData } = await supabase
+                .from('classroom_grades')
+                .select(`
+                    grades (
+                        program_id,
+                        programs (
+                            name
                         )
-                    `)
-                    .eq('classroom_id', classId)
-                    .limit(1)
-                    .single();
+                    )
+                `)
+                .eq('classroom_id', classId)
+                .limit(1)
+                .single();
 
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const gData = gradeData as any;
-                if (gData?.grades?.programs?.name) {
-                    const progName = gData.grades.programs.name.toUpperCase();
-                    if (progName.includes('KINDERGARTEN')) {
-                        currentGradeType = 'KINDERGARTEN';
-                    }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const gData = gradeData as any;
+            if (gData?.grades?.programs?.name) {
+                const progName = gData.grades.programs.name.toUpperCase();
+                if (progName.includes('KINDERGARTEN')) {
+                    currentGradeType = 'KINDERGARTEN';
                 }
-            } else {
-                if (classId.includes('kg')) currentGradeType = 'KINDERGARTEN';
             }
             setGradeType(currentGradeType);
 
             // 3. Fetch Students (via Enrollments) & Attendance & Vacations
-            if (isDev) {
-                setStudents([
-                    { id: 's1', first_name: 'Aarav', last_name: 'Sharma', status: 'UNMARKED', grade_type: 'KINDERGARTEN' },
-                    { id: 's2', first_name: 'Ishani', last_name: 'Verma', status: 'UNMARKED', grade_type: 'KINDERGARTEN' },
-                ]);
-            } else {
+            {
                 // Students are now linked via enrollments to classroom
                 // Query Enrollments -> Students
                 const { data: enrollmentData } = await supabase
@@ -181,7 +167,7 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
         } finally {
             setLoading(false);
         }
-    }, [classId, date, isDev, supabase]);
+    }, [classId, date, supabase]);
 
     useEffect(() => {
         fetchData();
@@ -211,11 +197,6 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
 
     const saveAttendance = async () => {
         setSaving(true);
-        if (isDev) {
-            await new Promise(r => setTimeout(r, 1000));
-            setSaving(false);
-            return;
-        }
 
         const updates = students
             .filter(s => s.status !== 'UNMARKED')

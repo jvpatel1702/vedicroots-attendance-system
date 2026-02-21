@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { X, Calculator, AlertCircle, CheckCircle, Calendar, Clock } from 'lucide-react';
-import { calculateExtendedCareFee, saveExtendedCareEnrollment } from '@/app/actions/extendedCare';
+import { calculateExtendedCareFee, saveExtendedCareEnrollment } from '@/lib/actions/extendedCare';
 import { useOrganization } from '@/context/OrganizationContext';
 import { format, startOfMonth } from 'date-fns';
 

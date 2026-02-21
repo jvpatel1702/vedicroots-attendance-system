@@ -1,52 +1,62 @@
+'use client';
+
 import { useEffect, useState } from 'react';
 import { createClient } from './supabaseClient';
 import { User } from '@supabase/supabase-js';
 
-// Define a robust User type that includes Supabase User properties we use
+/**
+ * Extends the Supabase User type with app-specific profile data.
+ */
 export interface AppUser extends Partial<User> {
     id: string;
     email?: string;
-    /** The role of the user (e.g., 'ADMIN', 'TEACHER', 'OFFICE') */
+    /** The role of the user, fetched from the `profiles` table (e.g., 'ADMIN', 'TEACHER', 'OFFICE') */
     role?: string;
+    /** All roles assigned to the user, if multi-role is enabled */
+    roles?: string[];
 }
 
 /**
- * Custom hook to fetch and provide the current user's authentication state.
- * 
- * This hook handles:
- * - Fetching the user from Supabase Auth.
- * - Simulating a development user if a 'dev_role' cookie is present.
- * - Managing loading state.
- * 
- * @returns An object containing the user object, loading state, and dev mode flag.
+ * Custom hook to fetch and provide the current authenticated user,
+ * including their role from the `profiles` table.
+ *
+ * Role is ALWAYS fetched server-side from the database — never trusted from
+ * client-side state, cookies, or localStorage.
+ *
+ * @returns An object containing the user object and loading state.
  */
 export function useUser() {
     const [user, setUser] = useState<AppUser | null>(null);
     const [loading, setLoading] = useState(true);
-    const [isDev, setIsDev] = useState(false);
 
     useEffect(() => {
         async function getUser() {
-            // Check for dev cookie
-            const devRole = document.cookie.split('; ').find(row => row.startsWith('dev_role='))?.split('=')[1];
+            const supabase = createClient();
+            const { data: { user: authUser } } = await supabase.auth.getUser();
 
-            if (devRole) {
-                setIsDev(true);
-                // Mock User
-                setUser({
-                    id: 'dev-user-id',
-                    email: devRole === 'ADMIN' ? 'admin@dev.com' : 'teacher@dev.com',
-                    role: devRole
-                } as AppUser);
-            } else {
-                const supabase = createClient();
-                const { data } = await supabase.auth.getUser();
-                setUser(data.user as AppUser);
+            if (!authUser) {
+                setUser(null);
+                setLoading(false);
+                return;
             }
+
+            // Fetch the role from the profiles table — never trust client-side state
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role, roles')
+                .eq('id', authUser.id)
+                .single();
+
+            setUser({
+                ...authUser,
+                role: profile?.role ?? undefined,
+                roles: profile?.roles ?? undefined,
+            });
+
             setLoading(false);
         }
         getUser();
     }, []);
 
-    return { user, loading, isDev };
+    return { user, loading };
 }

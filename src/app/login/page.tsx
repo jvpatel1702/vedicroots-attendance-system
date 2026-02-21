@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { Loader2, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
@@ -10,8 +10,36 @@ export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [checking, setChecking] = useState(true); // true while we verify existing session
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
+
+    // Redirect already-authenticated users to their dashboard
+    useEffect(() => {
+        async function checkSession() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', session.user.id)
+                    .single();
+
+                if (profile?.role === 'ADMIN') {
+                    router.replace('/admin');
+                } else if (profile?.role === 'TEACHER') {
+                    router.replace('/teacher');
+                } else if (profile?.role === 'OFFICE') {
+                    router.replace('/office');
+                } else {
+                    setChecking(false);
+                }
+            } else {
+                setChecking(false);
+            }
+        }
+        checkSession();
+    }, []);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -37,7 +65,6 @@ export default function LoginPage() {
 
             if (profileError) {
                 console.error("Profile fetch error:", profileError);
-                // Fallback or retry logic could go here, but for now we proceed or alert
             }
 
             if (profile?.role === 'ADMIN') {
@@ -52,10 +79,19 @@ export default function LoginPage() {
             }
         } catch (err: any) {
             setError(err.message || "An unexpected error occurred");
-            setLoading(false); // Only set loading false on error, otherwise we navigate
+            setLoading(false);
         }
         // Note: We don't set loading false on success to prevent UI flash before navigation
     };
+
+    // Show a blank screen while checking existing session to avoid a login form flash
+    if (checking) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-50 p-4">

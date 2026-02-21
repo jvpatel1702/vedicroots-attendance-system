@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { clockIn, clockOut, getTodayStatus } from '@/app/actions/staff-attendance';
+import { clockIn, clockOut, getTodayStatus } from '@/lib/actions/staff-attendance';
 import { Loader2, MapPin, Clock } from 'lucide-react';
 
 interface Props {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useOrganization } from '@/context/OrganizationContext';
-import { getHolidays, saveHoliday, deleteHoliday } from '@/app/actions/holidays';
+import { getHolidays, saveHoliday, deleteHoliday } from '@/lib/actions/holidays';
 import { SchoolHoliday } from '@/lib/classroomUtils';
 import { Calendar, Plus, Trash2, Edit2, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';

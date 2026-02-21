@@ -22,7 +22,7 @@ const DASHBOARD_OPTIONS: DashboardOption[] = [
     { role: 'ADMIN', label: 'Admin Panel', path: '/admin', icon: <Shield size={16} />, color: 'text-red-600' },
     { role: 'TEACHER', label: 'Teacher Dashboard', path: '/teacher', icon: <GraduationCap size={16} />, color: 'text-blue-600' },
     { role: 'OFFICE', label: 'Office Dashboard', path: '/office', icon: <Building size={16} />, color: 'text-green-600' },
-    { role: 'PARENT', label: 'Parent Portal', path: '/parent', icon: <Users size={16} />, color: 'text-purple-600' },
+    // PARENT portal is not yet implemented — add entry here when /parent route exists
 ];
 
 /**

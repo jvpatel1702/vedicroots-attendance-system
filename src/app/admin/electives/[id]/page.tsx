@@ -1,4 +1,4 @@
-import { getElectiveClasses, getElectiveOfferings } from "@/app/actions/electives"
+import { getElectiveClasses, getElectiveOfferings } from "@/lib/actions/electives"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/server"

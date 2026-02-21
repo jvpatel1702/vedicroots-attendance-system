@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input' // Actually use a Combobox if possible
 import { Label } from '@/components/ui/label'
-import { enrollStudentInElective, getElectiveEnrollments } from '@/app/actions/electives'
+import { enrollStudentInElective, getElectiveEnrollments } from '@/lib/actions/electives'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'

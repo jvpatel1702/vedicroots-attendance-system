@@ -1,30 +1,56 @@
 /**
  * Students Index Page (Admin)
  * ---------------------------
- * Displays a list of all students with bulk actions support.
- * 
- * Key Data Structure:
- * - joins `persons` to get first_name, last_name, photo.
- * - joins `enrollments` -> `classrooms` to get current class info.
+ * Displays the full student roster filtered by academic year.
+ *
+ * Data flow:
+ *  - `useAcademicYears()` — fetches academic years for the year-filter dropdown.
+ *  - `useStudents(orgId, selectedYear)` — fetches students for a specific org+year.
+ *    Includes gender (for row coloring), dob (for age), and guardian contact info.
+ *
+ * Row coloring:
+ *  - Male   → subtle blue  (bg-blue-50)
+ *  - Female → subtle rose  (bg-rose-50)
+ *  - Other/unset → neutral white
+ *
+ * Email / Phone:
+ *  - Pulled from the student's primary guardian first.
+ *  - Falls back to the first available guardian if none is marked primary.
+ *  - Displays "-" when no guardian contact exists.
  */
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/lib/supabaseClient';
-import { Plus, Edit, Calendar, FileSpreadsheet, Trash2, Users, CheckSquare, Square, X, GraduationCap, ExternalLink, Filter } from 'lucide-react';
-import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Filter, Plus } from 'lucide-react';
+
 import StudentForm from '@/components/admin/StudentForm';
 import VacationModal from '@/components/admin/VacationModal';
 import CsvStudentImport from '@/components/admin/CsvStudentImport';
 import { useOrganization } from '@/context/OrganizationContext';
+import { useStudents, useAcademicYears } from '@/lib/queries';
+import { useQueryClient } from '@tanstack/react-query';
+
+// ── Type Definitions ─────────────────────────────────────────────────────────
+
+interface GuardianContact {
+    is_primary?: boolean;
+    guardians: {
+        email?: string | null;
+        phone?: string | null;
+    } | null;
+}
 
 interface Student {
     id: string;
     student_number: string;
+    gender?: string | null;
+    dob?: string | null;          // from students table (legacy column)
     person: {
         first_name: string;
         last_name: string;
-        photo_url?: string;
+        dob?: string | null;      // from persons table (new column)
+        photo_url?: string | null;
     };
     medical?: {
         allergies: string;
@@ -33,349 +59,132 @@ interface Student {
         doctor_name: string;
         doctor_phone: string;
     };
+    student_guardians?: GuardianContact[];
     enrollments?: {
         classrooms: { id: string; name: string } | null;
-        grades: { id: string; name: string } | null;
+        grades: { id: string; name: string; order?: number } | null;
         classroom_id: string;
         grade_id: string;
+        academic_year_id: string;
         status: string;
     }[];
 }
 
-interface Classroom {
-    id: string;
-    name: string;
+interface AcademicYear { id: string; name: string; is_active: boolean; }
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Calculates age from a date-of-birth string and returns a formatted string
+ * like "4Y 2M". Under 1 year, returns just "8M".
+ * Returns null when dob is not available.
+ */
+function getAge(dob: string | null | undefined): string | null {
+    if (!dob) return null;
+    const birth = new Date(dob);
+    const today = new Date();
+
+    let years = today.getFullYear() - birth.getFullYear();
+    let months = today.getMonth() - birth.getMonth();
+
+    if (today.getDate() < birth.getDate()) months--;
+    if (months < 0) { years--; months += 12; }
+
+    if (years === 0) return `${months}M`;
+    if (months === 0) return `${years}Y`;
+    return `${years}Y ${months}M`;
 }
 
-interface Grade {
-    id: string;
-    name: string;
+/**
+ * Picks the best guardian contact record from a student's guardian list.
+ * Priority: primary guardian → first guardian with data → null.
+ */
+function getPrimaryGuardian(guardians: GuardianContact[] | undefined): GuardianContact['guardians'] | null {
+    if (!guardians || guardians.length === 0) return null;
+    const primary = guardians.find(g => g.is_primary && g.guardians);
+    if (primary?.guardians) return primary.guardians;
+    return guardians.find(g => g.guardians)?.guardians ?? null;
 }
 
-interface AcademicYear {
-    id: string;
-    name: string;
-    is_active: boolean;
+/**
+ * Returns hover-only row classes based on student gender.
+ * Rows are white at rest — the color only appears on hover,
+ * giving a subtle visual cue without cluttering the table.
+ */
+function getGenderRowClass(gender: string | null | undefined): string {
+    if (gender === 'Male') return 'hover:bg-blue-100';
+    if (gender === 'Female') return 'hover:bg-rose-100';
+    return 'hover:bg-gray-50';
 }
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function StudentsPage() {
-    const supabase = createClient();
+    const router = useRouter();
     const { selectedOrganization } = useOrganization();
-    const [students, setStudents] = useState<Student[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [classrooms, setClassrooms] = useState<Classroom[]>([]);
-    const [grades, setGrades] = useState<Grade[]>([]);
-    const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
+    const queryClient = useQueryClient();
+
+    // ── Filter / sort state ────────────────────────────────────────────────
     const [selectedYear, setSelectedYear] = useState<string>('');
+    // 'asc' = lowest grade first (default), 'desc' = highest grade first
+    const [gradeSort, setGradeSort] = useState<'asc' | 'desc'>('asc');
 
-    // Selection state
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [bulkAction, setBulkAction] = useState<'move' | 'status' | 'grade' | 'delete' | null>(null);
-    const [targetClassroom, setTargetClassroom] = useState<string>('');
-    const [targetStatus, setTargetStatus] = useState<string>('ACTIVE');
-    const [processing, setProcessing] = useState(false);
-    const [targetGrade, setTargetGrade] = useState<string>('');
-
-    // Modals
+    // ── Modal state ───────────────────────────────────────────────────────
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);
     const [vacationStudent, setVacationStudent] = useState<Student | null>(null);
 
-    const fetchAcademicYears = useCallback(async () => {
-        const { data } = await supabase
-            .from('academic_years')
-            .select('*')
-            .order('start_date', { ascending: false });
+    // ── TanStack Queries ──────────────────────────────────────────────────
 
-        if (data) {
-            setAcademicYears(data);
-            // Default to active year if no year selected
-            if (!selectedYear) {
-                const active = data.find(y => y.is_active);
-                if (active) setSelectedYear(active.id);
-            }
-        }
-    }, [supabase, selectedYear]);
+    /** Academic years list for the filter dropdown */
+    const { data: academicYears = [] } = useAcademicYears();
 
-    const fetchStudents = useCallback(async () => {
-        if (!selectedOrganization) return;
-        setLoading(true);
+    /**
+     * Student roster — only runs when orgId and selectedYear are both set.
+     * Enrollment data is pre-filtered to the selected academic year by the query.
+     */
+    const { data: students = [], isLoading } = useStudents(selectedOrganization?.id, selectedYear);
 
-        // 1. Get classrooms for this organization to filter students
-        const { data: orgClassrooms } = await supabase
-            .from('classrooms')
-            .select('id')
-            .in('location_id', (
-                await supabase
-                    .from('locations')
-                    .select('id')
-                    .eq('organization_id', selectedOrganization.id)
-            ).data?.map(l => l.id) || []);
+    /** Students sorted by grade order; falls back to grade name alphabetically */
+    const sortedStudents = [...(students as Student[])].sort((a, b) => {
+        const gradeA = a.enrollments?.[0]?.grades;
+        const gradeB = b.enrollments?.[0]?.grades;
+        const orderA = gradeA?.order ?? 9999;
+        const orderB = gradeB?.order ?? 9999;
+        if (orderA !== orderB) return gradeSort === 'asc' ? orderA - orderB : orderB - orderA;
+        // Secondary sort: grade name alphabetically when order values are identical/missing
+        const nameA = gradeA?.name ?? '';
+        const nameB = gradeB?.name ?? '';
+        return gradeSort === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+    });
 
-        const classroomIds = orgClassrooms?.map(c => c.id) || [];
-
-        let query = supabase
-            .from('students')
-            .select(`
-                *,
-                person:persons!inner (
-                    first_name,
-                    last_name,
-                    photo_url
-                ),
-                medical:student_medical (
-                    allergies,
-                    medical_conditions,
-                    medications,
-                    doctor_name,
-                    doctor_phone
-                ),
-                enrollments!inner (
-                    status,
-                    classroom_id,
-                    grade_id,
-                    academic_year_id,
-                    classrooms (id, name),
-                    grades (id, name)
-                )
-            `);
-
-        // Apply filters
-        if (classroomIds.length > 0) {
-            // We filter enrollments by organization's classrooms OR we can rely on the fact that an enrollment belongs to a classroom which belongs to a location...
-            // But 'enrollments!inner' filters the students. 
-            // Ideally we want students who have an enrollment in the selected year AND in a classroom belonging to this Org.
-        }
-
-        // Actually, let's refine the query.
-        // We want students valid for the selected Organization.
-        // That implies they have an enrollment in one of the organization's classrooms.
-
-        if (selectedYear) {
-            query = query.eq('enrollments.academic_year_id', selectedYear);
-        }
-
-        // We also need to filter by Organization. 
-        // Since Supabase filtering on inner joined tables can be tricky for "contains",
-        // we might best filter by checking if any of their enrollments match our classroom list.
-        // However, !inner on enrollments with a filter should work.
-
-        if (classroomIds.length > 0) {
-            query = query.in('enrollments.classroom_id', classroomIds);
-        } else {
-            // If organization has no classrooms, likely no students to show for this org
-            setStudents([]);
-            setLoading(false);
-            return;
-        }
-
-        const { data, error } = await query;
-
-        if (error) {
-            console.error('Error fetching students:', error);
-        }
-
-        if (data) {
-            // Filter out any students that don't have a linked person record
-            const validStudents = (data as any[]).filter(s => s.person).map(s => s as Student);
-            setStudents(validStudents);
-        }
-        setLoading(false);
-    }, [supabase]);
-
-    const fetchClassrooms = useCallback(async () => {
-        if (!selectedOrganization) return;
-        const { data: locations } = await supabase
-            .from('locations')
-            .select('id')
-            .eq('organization_id', selectedOrganization.id);
-
-        if (locations && locations.length > 0) {
-            const { data } = await supabase
-                .from('classrooms')
-                .select('id, name')
-                .in('location_id', locations.map(l => l.id));
-            if (data) setClassrooms(data);
-        }
-    }, [supabase, selectedOrganization]);
-
-    const fetchGrades = useCallback(async () => {
-        if (!selectedOrganization) return;
-
-        // Fetch grades directly by organization_id
-        const { data } = await supabase
-            .from('grades')
-            .select('id, name')
-            .eq('organization_id', selectedOrganization.id)
-            .order('order');
-        if (data) setGrades(data);
-    }, [supabase, selectedOrganization]);
-
+    // ── Side effect: set default academic year once list loads ────────────
     useEffect(() => {
-        fetchAcademicYears();
-    }, [fetchAcademicYears]);
-
-    useEffect(() => {
-        if (selectedYear) {
-            fetchStudents();
+        if ((academicYears as AcademicYear[]).length > 0 && !selectedYear) {
+            const active = (academicYears as AcademicYear[]).find(y => y.is_active);
+            setSelectedYear(active?.id ?? (academicYears as AcademicYear[])[0]?.id ?? '');
         }
-        fetchClassrooms();
-        fetchGrades();
-    }, [fetchStudents, fetchClassrooms, fetchGrades, selectedYear]);
+    }, [academicYears, selectedYear]);
 
-    const handleEdit = (student: Student) => {
-        setEditingStudent(student);
-        setIsFormOpen(true);
-    };
+    // ── Handlers ──────────────────────────────────────────────────────────
 
-    const handleAdd = () => {
-        setEditingStudent(null);
-        setIsFormOpen(true);
-    };
+    const handleAdd = () => { setEditingStudent(null); setIsFormOpen(true); };
 
-    // Selection handlers
-    const toggleSelection = (id: string) => {
-        const newSet = new Set(selectedIds);
-        if (newSet.has(id)) {
-            newSet.delete(id);
-        } else {
-            newSet.add(id);
-        }
-        setSelectedIds(newSet);
-    };
-
-    const toggleSelectAll = () => {
-        if (selectedIds.size === students.length) {
-            setSelectedIds(new Set());
-        } else {
-            setSelectedIds(new Set(students.map(s => s.id)));
-        }
-    };
-
-    const clearSelection = () => {
-        setSelectedIds(new Set());
-        setBulkAction(null);
-    };
-
-    // Bulk action handlers
-    const handleBulkMoveToClassroom = async () => {
-        if (!targetClassroom) return;
-        setProcessing(true);
-
-        // Get active academic year
-        const { data: academicYear } = await supabase
-            .from('academic_years')
-            .select('id')
-            .eq('is_active', true)
-            .single();
-
-        for (const studentId of selectedIds) {
-            // Check for existing enrollment (any status)
-            const { data: existing } = await supabase
-                .from('enrollments')
-                .select('id, status')
-                .eq('student_id', studentId)
-                .limit(1)
-                .maybeSingle();
-
-            if (existing) {
-                // Update existing enrollment
-                const { error } = await supabase
-                    .from('enrollments')
-                    .update({ classroom_id: targetClassroom, status: 'ACTIVE' })
-                    .eq('id', existing.id);
-                if (error) console.error('Update enrollment error:', error);
-            } else if (academicYear) {
-                // Create new enrollment
-                const { error } = await supabase
-                    .from('enrollments')
-                    .insert({
-                        student_id: studentId,
-                        classroom_id: targetClassroom,
-                        academic_year_id: academicYear.id,
-                        status: 'ACTIVE'
-                    });
-                if (error) console.error('Insert enrollment error:', error);
-            }
-        }
-
-        setProcessing(false);
-        clearSelection();
-        fetchStudents();
-    };
-
-    const handleBulkChangeStatus = async () => {
-        setProcessing(true);
-
-        for (const studentId of selectedIds) {
-            await supabase
-                .from('enrollments')
-                .update({ status: targetStatus })
-                .eq('student_id', studentId)
-                .eq('status', 'ACTIVE');
-        }
-
-        setProcessing(false);
-        clearSelection();
-        fetchStudents();
-    };
-
-    const handleBulkChangeGrade = async () => {
-        if (!targetGrade) return;
-        setProcessing(true);
-
-        for (const studentId of selectedIds) {
-            // First check if enrollment exists
-            const { data: existing } = await supabase
-                .from('enrollments')
-                .select('id')
-                .eq('student_id', studentId)
-                .limit(1)
-                .maybeSingle();
-
-            if (existing) {
-                const { error } = await supabase
-                    .from('enrollments')
-                    .update({ grade_id: targetGrade })
-                    .eq('id', existing.id);
-                if (error) console.error('Update grade error:', error);
-            }
-        }
-
-        setProcessing(false);
-        clearSelection();
-        fetchStudents();
-    };
-
-    const handleBulkDelete = async () => {
-        if (!confirm(`Are you sure you want to delete ${selectedIds.size} student(s)? This action cannot be undone.`)) {
-            return;
-        }
-        setProcessing(true);
-
-        for (const studentId of selectedIds) {
-            // Delete enrollments first
-            await supabase.from('enrollments').delete().eq('student_id', studentId);
-            // Delete student
-            await supabase.from('students').delete().eq('id', studentId);
-        }
-
-        setProcessing(false);
-        clearSelection();
-        fetchStudents();
-    };
-
-    const isAllSelected = students.length > 0 && selectedIds.size === students.length;
+    // ── Render ────────────────────────────────────────────────────────────
 
     return (
         <div className="space-y-6">
+
+            {/* ── Page Header ──────────────────────────────────────────────── */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Students</h2>
-                    <p className="text-gray-500 text-sm">Manage student enrollment and details.</p>
+                    <h2 className="text-2xl font-bold text-gray-900">Students List</h2>
+                    <p className="text-gray-500 text-sm">Manage Student Information</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* Academic year filter — changing this updates the query key,
+                        causing TanStack Query to fetch for the new year */}
                     <div className="relative">
                         <select
                             value={selectedYear}
@@ -383,7 +192,7 @@ export default function StudentsPage() {
                             className="appearance-none bg-white border border-gray-300 text-gray-700 py-2 pl-3 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-gray-500"
                         >
                             <option value="">Select Year...</option>
-                            {academicYears.map(year => (
+                            {(academicYears as AcademicYear[]).map(year => (
                                 <option key={year.id} value={year.id}>{year.name}</option>
                             ))}
                         </select>
@@ -391,12 +200,6 @@ export default function StudentsPage() {
                             <Filter size={16} />
                         </div>
                     </div>
-                    <button
-                        onClick={() => setIsImportOpen(true)}
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-700 transition-colors"
-                    >
-                        <FileSpreadsheet size={18} /> Import CSV
-                    </button>
                     <button
                         onClick={handleAdd}
                         className="bg-indigo-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-700 transition-colors"
@@ -406,215 +209,131 @@ export default function StudentsPage() {
                 </div>
             </div>
 
-            {/* Bulk Action Bar */}
-            {selectedIds.size > 0 && (
-                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-center justify-between animate-in slide-in-from-top-2">
-                    <div className="flex items-center gap-3">
-                        <CheckSquare className="text-indigo-600" size={20} />
-                        <span className="font-semibold text-indigo-900">{selectedIds.size} student(s) selected</span>
-                        <button onClick={clearSelection} className="text-indigo-600 hover:text-indigo-800 text-sm underline">
-                            Clear
-                        </button>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {/* Move to Classroom */}
-                        {bulkAction === 'move' ? (
-                            <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-1.5 border border-indigo-200">
-                                <select
-                                    value={targetClassroom}
-                                    onChange={(e) => setTargetClassroom(e.target.value)}
-                                    className="text-sm border-none focus:ring-0"
-                                >
-                                    <option value="">Select classroom...</option>
-                                    {classrooms.map(c => (
-                                        <option key={c.id} value={c.id}>{c.name}</option>
-                                    ))}
-                                </select>
-                                <button
-                                    onClick={handleBulkMoveToClassroom}
-                                    disabled={!targetClassroom || processing}
-                                    className="bg-indigo-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
-                                >
-                                    {processing ? 'Moving...' : 'Apply'}
-                                </button>
-                                <button onClick={() => setBulkAction(null)} className="text-gray-400 hover:text-gray-600">
-                                    <X size={16} />
-                                </button>
-                            </div>
-                        ) : (
-                            <button
-                                onClick={() => setBulkAction('move')}
-                                className="bg-white border border-indigo-200 text-indigo-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-indigo-100 transition-colors text-sm"
-                            >
-                                <Users size={16} /> Move to Classroom
-                            </button>
-                        )}
-
-                        {/* Change Status */}
-                        {bulkAction === 'status' ? (
-                            <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-1.5 border border-indigo-200">
-                                <select
-                                    value={targetStatus}
-                                    onChange={(e) => setTargetStatus(e.target.value)}
-                                    className="text-sm border-none focus:ring-0"
-                                >
-                                    <option value="ACTIVE">Active</option>
-                                    <option value="INACTIVE">Inactive</option>
-                                    <option value="GRADUATED">Graduated</option>
-                                    <option value="WITHDRAWN">Withdrawn</option>
-                                </select>
-                                <button
-                                    onClick={handleBulkChangeStatus}
-                                    disabled={processing}
-                                    className="bg-amber-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
-                                >
-                                    {processing ? 'Updating...' : 'Apply'}
-                                </button>
-                                <button onClick={() => setBulkAction(null)} className="text-gray-400 hover:text-gray-600">
-                                    <X size={16} />
-                                </button>
-                            </div>
-                        ) : (
-                            <button
-                                onClick={() => setBulkAction('status')}
-                                className="bg-white border border-amber-200 text-amber-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-amber-50 transition-colors text-sm"
-                            >
-                                Change Status
-                            </button>
-                        )}
-
-                        {/* Change Grade */}
-                        {bulkAction === 'grade' ? (
-                            <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-1.5 border border-green-200">
-                                <select
-                                    value={targetGrade}
-                                    onChange={(e) => setTargetGrade(e.target.value)}
-                                    className="text-sm border-none focus:ring-0"
-                                >
-                                    <option value="">Select grade...</option>
-                                    {grades.map(g => (
-                                        <option key={g.id} value={g.id}>{g.name}</option>
-                                    ))}
-                                </select>
-                                <button
-                                    onClick={handleBulkChangeGrade}
-                                    disabled={!targetGrade || processing}
-                                    className="bg-green-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50"
-                                >
-                                    {processing ? 'Updating...' : 'Apply'}
-                                </button>
-                                <button onClick={() => setBulkAction(null)} className="text-gray-400 hover:text-gray-600">
-                                    <X size={16} />
-                                </button>
-                            </div>
-                        ) : (
-                            <button
-                                onClick={() => setBulkAction('grade')}
-                                className="bg-white border border-green-200 text-green-700 px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-green-50 transition-colors text-sm"
-                            >
-                                <GraduationCap size={16} /> Change Grade
-                            </button>
-                        )}
-
-                        {/* Delete */}
-                        <button
-                            onClick={handleBulkDelete}
-                            disabled={processing}
-                            className="bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-red-700 transition-colors text-sm disabled:opacity-50"
-                        >
-                            <Trash2 size={16} /> Delete
-                        </button>
-                    </div>
-                </div>
-            )}
-
+            {/* ── Students Table ────────────────────────────────────────────── */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-50 border-b border-gray-100">
                         <tr>
-                            <th className="px-4 py-4 w-12">
-                                <button onClick={toggleSelectAll} className="text-gray-400 hover:text-gray-600">
-                                    {isAllSelected ? <CheckSquare size={20} className="text-indigo-600" /> : <Square size={20} />}
-                                </button>
-                            </th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Full Name</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Age</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Email</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Phone</th>
+                            <th
+                                className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase cursor-pointer select-none hover:text-indigo-600 transition-colors"
+                                onClick={() => setGradeSort(s => s === 'asc' ? 'desc' : 'asc')}
+                                title="Click to toggle sort order"
+                            >
+                                Grade {gradeSort === 'asc' ? '↑' : '↓'}
+                            </th>
                             <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Classroom</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Grade</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase"></th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                        {loading ? (
-                            <tr><td colSpan={5} className="p-8 text-center text-gray-400">Loading students...</td></tr>
-                        ) : students.length === 0 ? (
-                            <tr><td colSpan={5} className="p-8 text-center text-gray-400">No students found.</td></tr>
+                        {isLoading ? (
+                            <tr>
+                                <td colSpan={6} className="p-8 text-center text-gray-400">
+                                    Loading students...
+                                </td>
+                            </tr>
+                        ) : (students as Student[]).length === 0 ? (
+                            <tr>
+                                <td colSpan={6} className="p-8 text-center text-gray-400">
+                                    No students found for this year.
+                                </td>
+                            </tr>
                         ) : (
-                            students.map(student => (
-                                <tr key={student.id} className={`hover:bg-gray-50 group transition-colors ${selectedIds.has(student.id) ? 'bg-indigo-50' : ''}`}>
-                                    <td className="px-4 py-4">
-                                        <button onClick={() => toggleSelection(student.id)} className="text-gray-400 hover:text-gray-600">
-                                            {selectedIds.has(student.id) ? (
-                                                <CheckSquare size={20} className="text-indigo-600" />
-                                            ) : (
-                                                <Square size={20} />
-                                            )}
-                                        </button>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 font-bold overflow-hidden border border-indigo-100">
-                                                {student.person.photo_url ? (
-                                                    /* eslint-disable-next-line @next/next/no-img-element */
-                                                    <img src={student.person.photo_url} alt={student.person.first_name} className="h-full w-full object-cover" />
-                                                ) : (
-                                                    student.person.first_name[0]
-                                                )}
+                            sortedStudents.map(student => {
+                                // Derive display values — prefer root dob (legacy column), fall back to persons.dob
+                                const age = getAge(student.dob ?? student.person.dob);
+                                const guardian = getPrimaryGuardian(student.student_guardians);
+                                const email = guardian?.email || null;
+                                const phone = guardian?.phone || null;
+
+                                // Enrollment for this specific year (query already filters it)
+                                const enrollment = student.enrollments?.[0];
+                                const classroom = enrollment?.classrooms?.name ?? 'Unassigned';
+                                const grade = enrollment?.grades?.name ?? 'N/A';
+
+                                // Subtle gender-based background
+                                const rowClass = getGenderRowClass(student.gender);
+
+                                return (
+                                    <tr
+                                        key={student.id}
+                                        onClick={() => router.push(`/admin/students/${student.id}`)}
+                                        className={`group transition-colors cursor-pointer ${rowClass}`}
+                                    >
+                                        {/* Name + avatar */}
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-9 w-9 rounded-full flex items-center justify-center text-indigo-600 font-bold overflow-hidden border border-indigo-100 bg-indigo-50 flex-shrink-0">
+                                                    {student.person.photo_url ? (
+                                                        // eslint-disable-next-line @next/next/no-img-element
+                                                        <img src={student.person.photo_url} alt={student.person.first_name} className="h-full w-full object-cover" />
+                                                    ) : (
+                                                        student.person.first_name[0]
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <span className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                                                        {student.person.first_name} {student.person.last_name}
+                                                    </span>
+                                                    <p className="text-xs text-gray-400">ID: {student.student_number}</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <Link href={`/admin/students/${student.id}`} className="font-semibold text-gray-900 hover:text-indigo-600 hover:underline transition-colors">
-                                                    {student.person.first_name} {student.person.last_name}
-                                                </Link>
-                                                <p className="text-xs text-gray-400">ID: {student.student_number}</p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-600">
-                                        {(() => {
-                                            const active = student.enrollments?.find(e => e.status === 'ACTIVE');
-                                            return active?.classrooms?.name || 'Unassigned';
-                                        })()}
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-gray-600">
-                                        <span className="px-2 py-1 bg-gray-100 rounded text-xs font-medium">
-                                            {(() => {
-                                                const active = student.enrollments?.find(e => e.status === 'ACTIVE');
-                                                return active?.grades?.name || 'N/A';
-                                            })()}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <Link
-                                            href={`/admin/students/${student.id}`}
-                                            className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
-                                        >
-                                            View Details →
-                                        </Link>
-                                    </td>
-                                </tr>
-                            ))
+                                        </td>
+
+                                        {/* Age — calculated from dob */}
+                                        <td className="px-6 py-4 text-sm text-gray-600">
+                                            {age !== null ? age : <span className="text-gray-400">—</span>}
+                                        </td>
+
+                                        {/* Email — from primary guardian */}
+                                        <td className="px-6 py-4 text-sm text-gray-600">
+                                            {email
+                                                ? <a href={`mailto:${email}`} onClick={e => e.stopPropagation()} className="hover:text-indigo-600 hover:underline">{email}</a>
+                                                : <span className="text-gray-400">-</span>
+                                            }
+                                        </td>
+
+                                        {/* Phone — from primary guardian */}
+                                        <td className="px-6 py-4 text-sm text-gray-600">
+                                            {phone
+                                                ? <a href={`tel:${phone}`} onClick={e => e.stopPropagation()} className="hover:text-indigo-600 hover:underline">{phone}</a>
+                                                : <span className="text-gray-400">-</span>
+                                            }
+                                        </td>
+
+                                        {/* Grade — from enrollment for selected year */}
+                                        <td className="px-6 py-4 text-sm text-gray-600">
+                                            <span className="px-2 py-1 bg-gray-100 rounded text-xs font-medium">
+                                                {grade}
+                                            </span>
+                                        </td>
+
+                                        {/* Classroom — from enrollment for selected year */}
+                                        <td className="px-6 py-4 text-sm text-gray-600">
+                                            {classroom}
+                                        </td>
+                                    </tr>
+                                );
+                            })
                         )}
                     </tbody>
                 </table>
             </div>
 
-            {/* Modals */}
+            {/* ── Modals ───────────────────────────────────────────────────── */}
+
+            {/* Add/Edit Student form */}
             <StudentForm
                 isOpen={isFormOpen}
                 onClose={() => setIsFormOpen(false)}
                 student={editingStudent}
-                onSuccess={fetchStudents}
+                onSuccess={() => queryClient.invalidateQueries({ queryKey: ['students', selectedOrganization?.id, selectedYear] })}
             />
 
+            {/* Per-student vacation management modal */}
             {vacationStudent && (
                 <VacationModal
                     isOpen={!!vacationStudent}
@@ -624,10 +343,11 @@ export default function StudentsPage() {
                 />
             )}
 
+            {/* CSV import modal */}
             <CsvStudentImport
                 isOpen={isImportOpen}
                 onClose={() => setIsImportOpen(false)}
-                onSuccess={fetchStudents}
+                onSuccess={() => queryClient.invalidateQueries({ queryKey: ['students', selectedOrganization?.id, selectedYear] })}
             />
         </div>
     );

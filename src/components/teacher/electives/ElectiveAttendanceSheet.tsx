@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 
-import { getElectiveAttendanceSheet, markElectiveAttendance } from '@/app/actions/electives'
+import { getElectiveAttendanceSheet, markElectiveAttendance } from '@/lib/actions/electives'
 import { createClient } from '@/lib/supabaseClient'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'

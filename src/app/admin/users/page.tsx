@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { Users, Mail, Shield, Edit2, UserPlus, X, Check, Trash2, Key } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { createUser, updateUser, deleteUser } from '@/app/actions/users';
+import { createUser, updateUser, deleteUser } from '@/lib/actions/users';
 
 interface Profile {
     id: string;

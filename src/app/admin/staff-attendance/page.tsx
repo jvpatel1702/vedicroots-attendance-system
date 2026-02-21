@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { useOrganization } from '@/context/OrganizationContext';
 import { Loader2, Plus, Search, Calendar, Check, X, Clock } from 'lucide-react';
-import { clockIn, clockOut } from '@/app/actions/staff-attendance';
+import { clockIn, clockOut } from '@/lib/actions/staff-attendance';
 
 export default function StaffAttendancePage() {
     const supabase = createClient();

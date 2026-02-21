@@ -23,7 +23,7 @@ interface AttendanceRecord {
 
 export default function TeacherAttendancePage() {
     const supabase = createClient();
-    const { user, loading: userLoading, isDev } = useUser();
+    const { user, loading: userLoading } = useUser();
 
     const [classrooms, setClassrooms] = useState<Classroom[]>([]);
     const [selectedClassroom, setSelectedClassroom] = useState<string>('');
@@ -35,21 +35,12 @@ export default function TeacherAttendancePage() {
 
     // Fetch teacher's classrooms
     const fetchClassrooms = useCallback(async () => {
-        if (!user && !isDev) return;
-
-        if (isDev) {
-            setClassrooms([
-                { id: 'c1-dev', name: 'Ashoka House (Dev)' },
-                { id: 'c2-dev', name: 'Banyan House (Dev)' },
-            ]);
-            setLoading(false);
-            return;
-        }
+        if (!user) return;
 
         const { data } = await supabase
             .from('teacher_classrooms')
             .select('classrooms(id, name)')
-            .eq('teacher_id', user!.id);
+            .eq('teacher_id', user.id);
 
         if (data) {
             const formatted = data.map((item: any) => item.classrooms).filter(Boolean);
@@ -59,21 +50,11 @@ export default function TeacherAttendancePage() {
             }
         }
         setLoading(false);
-    }, [supabase, user, isDev]);
+    }, [supabase, user]);
 
     // Fetch students and attendance for selected classroom
     const fetchStudentsAndAttendance = useCallback(async () => {
         if (!selectedClassroom) return;
-
-        if (isDev) {
-            setStudents([
-                { id: 's1', student_number: 'S001', person: { first_name: 'Aarav', last_name: 'Sharma' } },
-                { id: 's2', student_number: 'S002', person: { first_name: 'Ishani', last_name: 'Verma' } },
-                { id: 's3', student_number: 'S003', person: { first_name: 'Vihaan', last_name: 'Gupta' } },
-            ]);
-            setAttendance({ s1: 'PRESENT', s2: null, s3: null });
-            return;
-        }
 
         // Fetch students enrolled in classroom
         const { data: enrollments } = await supabase
@@ -113,7 +94,7 @@ export default function TeacherAttendancePage() {
                 setAttendance(attendanceMap);
             }
         }
-    }, [supabase, selectedClassroom, date, isDev]);
+    }, [supabase, selectedClassroom, date]);
 
     useEffect(() => {
         if (!userLoading) fetchClassrooms();
@@ -144,7 +125,7 @@ export default function TeacherAttendancePage() {
                 marked_by: user?.id || null
             }));
 
-        if (records.length > 0 && !isDev) {
+        if (records.length > 0) {
             const { error } = await supabase
                 .from('attendance')
                 .upsert(records, { onConflict: 'student_id,date' });
@@ -154,8 +135,6 @@ export default function TeacherAttendancePage() {
             } else {
                 alert('Attendance saved successfully!');
             }
-        } else if (isDev) {
-            alert('Dev mode: Attendance would be saved');
         }
         setSaving(false);
     };

@@ -1,4 +1,4 @@
-import { getTeacherElectiveOfferings } from '@/app/actions/electives'
+import { getTeacherElectiveOfferings } from '@/lib/actions/electives'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'

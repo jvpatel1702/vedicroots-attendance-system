@@ -1,6 +1,6 @@
-import { getElectiveSubjects, getElectiveOfferings } from '@/app/actions/electives'
-import { getProfiles } from '@/app/actions/people' // Assuming this exists or similar
-import { getAcademicYears } from '@/app/actions/academic-years' // Assuming
+import { getElectiveSubjects, getElectiveOfferings } from '@/lib/actions/electives'
+import { getProfiles } from '@/lib/actions/people' // Assuming this exists or similar
+import { getAcademicYears } from '@/lib/actions/academic-years' // Assuming
 import ElectiveTabs from '@/components/admin/electives/ElectiveTabs'
 
 export default async function ElectivesPage() {
