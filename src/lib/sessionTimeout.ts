@@ -8,10 +8,21 @@ const DEFAULT_TIMEOUT_MINUTES = 15;
 /**
  * Inactivity timeout in milliseconds.
  * Reads from NEXT_PUBLIC_SESSION_INACTIVITY_TIMEOUT_MINUTES when set (client-safe).
+ * Set to 0 to disable the inactivity timeout; useInactivityLogout treats timeoutMs <= 0 as disabled.
  */
-export const INACTIVITY_TIMEOUT_MS =
-    typeof process.env.NEXT_PUBLIC_SESSION_INACTIVITY_TIMEOUT_MINUTES !== 'undefined'
-        ? Math.max(1, Number(process.env.NEXT_PUBLIC_SESSION_INACTIVITY_TIMEOUT_MINUTES) || DEFAULT_TIMEOUT_MINUTES) *
-          60 *
-          1000
-        : DEFAULT_TIMEOUT_MINUTES * 60 * 1000;
+function getInactivityTimeoutMs(): number {
+    const raw = process.env.NEXT_PUBLIC_SESSION_INACTIVITY_TIMEOUT_MINUTES;
+    if (typeof raw === 'undefined') {
+        return DEFAULT_TIMEOUT_MINUTES * 60 * 1000;
+    }
+    const minutes = Number(raw);
+    if (Number.isNaN(minutes) || minutes < 0) {
+        return DEFAULT_TIMEOUT_MINUTES * 60 * 1000;
+    }
+    if (minutes === 0) {
+        return 0;
+    }
+    return minutes * 60 * 1000;
+}
+
+export const INACTIVITY_TIMEOUT_MS = getInactivityTimeoutMs();

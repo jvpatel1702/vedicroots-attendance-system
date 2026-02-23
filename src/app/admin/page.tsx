@@ -17,7 +17,7 @@ export default function AdminDashboard() {
     const { data, isLoading } = useDashboardStats(selectedOrganization?.id);
 
     if (isOrgLoading) {
-        return <div className="p-8">Loading Organization Context...</div>;
+        return <div className="p-8">Loading Organization Stats...</div>;
     }
 
     const stats = {
