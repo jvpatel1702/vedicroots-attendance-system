@@ -69,7 +69,7 @@ export function DataTable<T>({
                     : 'px-6 py-4 text-xs font-semibold uppercase text-muted-foreground'
                 }
                 onClick={
-                  isSortable && col.sortKey
+                  onSort && col.sortKey
                     ? () => onSort(col.sortKey!)
                     : undefined
                 }
