@@ -49,33 +49,7 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            // 1. Fetch School Settings (Ideally linked to Org, defaulting to first for now)
-            let currentSettings: SchoolSettings = {
-                cutoff_time_kg: '09:15:00',
-                cutoff_time_elementary: '09:00:00'
-            };
-
-            const { data: settingsData } = await supabase.from('school_settings').select('*').single();
-            if (settingsData) {
-                currentSettings = {
-                    cutoff_time_kg: settingsData.cutoff_time_kg || settingsData.cutoff_time || '09:15:00',
-                    cutoff_time_elementary: settingsData.cutoff_time_elementary || settingsData.cutoff_time || '09:00:00'
-                };
-            }
-
-            // Fetch Today's Holiday
-            const { data: holidayData } = await supabase
-                .from('school_holidays')
-                .select('*')
-                .lte('start_date', date)
-                .gte('end_date', date);
-
-            if (holidayData && holidayData.length > 0) {
-                setTodayHoliday(holidayData[0] as SchoolHoliday);
-            }
-            setSettings(currentSettings);
-
-            // 2. Fetch Class Info and Grade Type via Programs
+            // 1. Fetch Class Info and Grade Type via Programs (needed for settings lookup)
             let currentGradeType: GradeType = 'ELEMENTARY';
 
             const { data: gradeData } = await supabase
@@ -94,6 +68,8 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const gData = gradeData as any;
+            const programId: string | null = gData?.grades?.program_id ?? null;
+
             if (gData?.grades?.programs?.name) {
                 const progName = gData.grades.programs.name.toUpperCase();
                 if (progName.includes('KINDERGARTEN')) {
@@ -101,6 +77,44 @@ export default function ClassroomPage(props: { params: Promise<{ classId: string
                 }
             }
             setGradeType(currentGradeType);
+
+            // 2. Fetch cutoff time from program_settings for this program
+            let currentSettings: SchoolSettings = {
+                cutoff_time_kg: '09:15:00',
+                cutoff_time_elementary: '09:00:00'
+            };
+
+            if (programId) {
+                const { data: ps } = await supabase
+                    .from('program_settings')
+                    .select('cutoff_time')
+                    .eq('program_id', programId)
+                    .single();
+
+                if (ps?.cutoff_time) {
+                    // program_settings has one cutoff_time per program;
+                    // set both fields to the same value — isPastCutoff picks the right one via gradeType
+                    currentSettings = {
+                        cutoff_time_kg: ps.cutoff_time,
+                        cutoff_time_elementary: ps.cutoff_time,
+                    };
+                }
+            }
+
+            // Fetch Today's Holiday
+            const { data: holidayData } = await supabase
+                .from('school_holidays')
+                .select('*')
+                .lte('start_date', date)
+                .gte('end_date', date);
+
+            if (holidayData && holidayData.length > 0) {
+                setTodayHoliday(holidayData[0] as SchoolHoliday);
+            }
+            setSettings(currentSettings);
+
+
+
 
             // 3. Fetch Students (via Enrollments) & Attendance & Vacations
             {

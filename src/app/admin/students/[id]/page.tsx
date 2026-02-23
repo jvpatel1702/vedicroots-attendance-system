@@ -225,7 +225,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             }
         }
 
-        // Fetch guardians
+        // Fetch guardians — names/contact come from persons via person_id FK
         const { data: guardianData } = await supabase
             .from('student_guardians')
             .select(`
@@ -234,17 +234,17 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 is_primary,
                 is_pickup_authorized,
                 is_emergency_contact,
-                guardians (id, first_name, last_name, email, phone)
+                guardians (id, person:persons!person_id(first_name, last_name, email, phone))
             `)
             .eq('student_id', id);
 
         if (guardianData) {
             setGuardians(guardianData.map((g: any) => ({
                 id: g.guardians.id,
-                first_name: g.guardians.first_name,
-                last_name: g.guardians.last_name,
-                email: g.guardians.email,
-                phone: g.guardians.phone,
+                first_name: g.guardians.person?.first_name ?? '',
+                last_name: g.guardians.person?.last_name ?? '',
+                email: g.guardians.person?.email ?? null,
+                phone: g.guardians.person?.phone ?? null,
                 relationship: g.relationship,
                 is_primary: g.is_primary,
                 is_pickup_authorized: g.is_pickup_authorized,
@@ -384,16 +384,34 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     const handleAddGuardian = async () => {
         if (!student || !newGuardian.first_name || !newGuardian.last_name) return;
         setSaving(true);
+
+        // 1. Create a person record for the guardian (names/contact live in persons)
+        const { data: person, error: pError } = await supabase
+            .from('persons')
+            .insert({
+                first_name: newGuardian.first_name,
+                last_name: newGuardian.last_name,
+                email: newGuardian.email || null,
+                phone: newGuardian.phone || null,
+            })
+            .select()
+            .single();
+        if (pError || !person) { alert('Error creating person: ' + pError?.message); setSaving(false); return; }
+
+        // 2. Create guardian record linked to the new person
         const { data: guardian, error: gError } = await supabase
             .from('guardians')
-            .insert({ first_name: newGuardian.first_name, last_name: newGuardian.last_name, email: newGuardian.email || null, phone: newGuardian.phone || null })
+            .insert({ person_id: person.id })
             .select()
             .single();
         if (gError || !guardian) { alert('Error creating guardian'); setSaving(false); return; }
+
+        // 3. Link guardian to student
         const { error: lError } = await supabase
             .from('student_guardians')
             .insert({ student_id: student.id, guardian_id: guardian.id, relationship: newGuardian.relationship, is_primary: guardians.length === 0 });
         if (lError) alert('Error linking guardian');
+
         setNewGuardian({ first_name: '', last_name: '', email: '', phone: '', relationship: 'Parent' });
         setShowAddGuardian(false);
         setSaving(false);

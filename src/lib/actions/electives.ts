@@ -211,7 +211,7 @@ export async function getElectiveEnrollments(offeringId: string) {
         .from('elective_enrollments')
         .select(`
       *,
-      student:students(first_name, last_name, id)
+      student:students(id, person:persons!person_id(first_name, last_name))
     `)
         .eq('offering_id', offeringId)
         .order('created_at', { ascending: false })
@@ -284,7 +284,7 @@ export async function getElectiveAttendanceSheet(offeringId: string, date: strin
         .from('elective_enrollments')
         .select(`
             id,
-            student:students(id, first_name, last_name)
+            student:students(id, person:persons!person_id(first_name, last_name))
         `)
         .eq('offering_id', offeringId)
         .lte('start_date', date)
@@ -309,13 +309,15 @@ export async function getElectiveAttendanceSheet(offeringId: string, date: strin
         .in('student_id', studentIds)
         .eq('date', date)
 
-    // 5. Merge
+    // 5. Merge — shape student to include first_name/last_name from persons
     return enrollments.map(enrollment => {
-        const record = attendance?.find(a => a.student_id === (enrollment.student as any).id)
-        const schoolRecord = schoolAttendance?.find(a => a.student_id === (enrollment.student as any).id)
+        const s = enrollment.student as any
+        const student = s ? { id: s.id, first_name: s.person?.first_name, last_name: s.person?.last_name } : null
+        const record = attendance?.find(a => a.student_id === s?.id)
+        const schoolRecord = schoolAttendance?.find(a => a.student_id === s?.id)
 
         return {
-            student: enrollment.student,
+            student,
             enrollment_id: enrollment.id,
             status: record?.status || 'UNMARKED',
             remarks: record?.remarks || '',
@@ -408,7 +410,7 @@ export async function getElectiveClassAttendance(classId: string) {
         .from('elective_enrollments')
         .select(`
             id,
-            student:students(id, first_name, last_name)
+            student:students(id, person:persons!person_id(first_name, last_name))
         `)
         .eq('offering_id', classSession.offering.id)
         .lte('start_date', classSession.date)
@@ -424,10 +426,13 @@ export async function getElectiveClassAttendance(classId: string) {
 
     if (attendanceError) throw new Error(attendanceError.message)
 
+    // Shape student to include first_name/last_name from persons
     return enrollments.map(enrollment => {
-        const record = attendance?.find(a => a.student_id === (enrollment.student as any).id)
+        const s = enrollment.student as any
+        const student = s ? { id: s.id, first_name: s.person?.first_name, last_name: s.person?.last_name } : null
+        const record = attendance?.find(a => a.student_id === s?.id)
         return {
-            student: enrollment.student,
+            student,
             enrollment_id: enrollment.id,
             status: record?.status || 'UNMARKED',
             remarks: record?.remarks || '',

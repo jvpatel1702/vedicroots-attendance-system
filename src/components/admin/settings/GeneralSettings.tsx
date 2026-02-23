@@ -11,7 +11,9 @@ export default function GeneralSettings() {
     const { selectedOrganization } = useOrganization();
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [settingsId, setSettingsId] = useState<string | null>(null);
+    // Track program IDs so we can upsert by (program_id, organization_id)
+    const [kgProgramId, setKgProgramId] = useState<string | null>(null);
+    const [elemProgramId, setElemProgramId] = useState<string | null>(null);
 
     // Check if this is a daycare organization
     const isDaycare = selectedOrganization?.type?.toLowerCase() === 'daycare';
@@ -38,83 +40,114 @@ export default function GeneralSettings() {
 
     const fetchSettings = async () => {
         if (!selectedOrganization) return;
-
         setLoading(true);
-        const { data } = await supabase
-            .from('school_settings')
+
+        // Fetch all programs for this org
+        const { data: programs } = await supabase
+            .from('programs')
+            .select('id, name')
+            .eq('organization_id', selectedOrganization.id);
+
+        if (!programs || programs.length === 0) { setLoading(false); return; }
+
+        // Identify KG vs Elementary programs by name convention
+        const kgProg = programs.find(p => /kindergarten|\bkg\b/i.test(p.name));
+        const elemProg = programs.find(p => !/kindergarten|\bkg\b/i.test(p.name));
+        const daycareProgram = isDaycare ? programs[0] : null;
+
+        if (kgProg) setKgProgramId(kgProg.id);
+        if (elemProg) setElemProgramId(elemProg.id);
+
+        // Fetch settings for all programs in this org
+        const { data: settingsRows } = await supabase
+            .from('program_settings')
             .select('*')
-            .eq('organization_id', selectedOrganization.id)
-            .single();
+            .eq('organization_id', selectedOrganization.id);
 
-        if (data) {
-            setSettingsId(data.id);
+        if (!settingsRows) { setLoading(false); return; }
 
-            // School settings
-            if (data.cutoff_time_kg) {
-                setCutoffTimeKg(data.cutoff_time_kg.slice(0, 5));
-            } else if (data.cutoff_time) {
-                setCutoffTimeKg(data.cutoff_time.slice(0, 5));
+        if (isDaycare && daycareProgram) {
+            const s = settingsRows.find(r => r.program_id === daycareProgram.id);
+            if (s) {
+                if (s.open_time) setOpenTime(s.open_time.slice(0, 5));
+                if (s.close_time) setCloseTime(s.close_time.slice(0, 5));
+                if (s.late_pickup_fee) setLatePickupFee(s.late_pickup_fee.toString());
             }
-            if (data.cutoff_time_elementary) {
-                setCutoffTimeElementary(data.cutoff_time_elementary.slice(0, 5));
-            } else if (data.cutoff_time) {
-                setCutoffTimeElementary(data.cutoff_time.slice(0, 5));
-            }
-            if (data.dropoff_time_kg) setDropoffTimeKg(data.dropoff_time_kg.slice(0, 5));
-            if (data.dropoff_time_elementary) setDropoffTimeElementary(data.dropoff_time_elementary.slice(0, 5));
-            if (data.pickup_time_kg) setPickupTimeKg(data.pickup_time_kg.slice(0, 5));
-            if (data.pickup_time_elementary) setPickupTimeElementary(data.pickup_time_elementary.slice(0, 5));
-            if (data.extended_care_rate_monthly) setExtendedCareRate(data.extended_care_rate_monthly.toString());
+        } else {
+            const kgS = kgProg ? settingsRows.find(r => r.program_id === kgProg.id) : null;
+            const elemS = elemProg ? settingsRows.find(r => r.program_id === elemProg.id) : null;
 
-            // Daycare settings
-            if (data.open_time) setOpenTime(data.open_time.slice(0, 5));
-            if (data.close_time) setCloseTime(data.close_time.slice(0, 5));
-            if (data.late_pickup_fee) setLatePickupFee(data.late_pickup_fee.toString());
+            if (kgS) {
+                if (kgS.cutoff_time) setCutoffTimeKg(kgS.cutoff_time.slice(0, 5));
+                if (kgS.dropoff_time) setDropoffTimeKg(kgS.dropoff_time.slice(0, 5));
+                if (kgS.pickup_time) setPickupTimeKg(kgS.pickup_time.slice(0, 5));
+            }
+            if (elemS) {
+                if (elemS.cutoff_time) setCutoffTimeElementary(elemS.cutoff_time.slice(0, 5));
+                if (elemS.dropoff_time) setDropoffTimeElementary(elemS.dropoff_time.slice(0, 5));
+                if (elemS.pickup_time) setPickupTimeElementary(elemS.pickup_time.slice(0, 5));
+            }
+            // Extended care rate is shared across programs — take from whichever row has it
+            const anyS = kgS || elemS;
+            if (anyS?.extended_care_rate_monthly) setExtendedCareRate(anyS.extended_care_rate_monthly.toString());
+            if (anyS?.open_time) setOpenTime(anyS.open_time.slice(0, 5));
+            if (anyS?.close_time) setCloseTime(anyS.close_time.slice(0, 5));
+            if (anyS?.late_pickup_fee) setLatePickupFee(anyS.late_pickup_fee.toString());
         }
         setLoading(false);
     };
 
     const handleSave = async () => {
         if (!selectedOrganization) return;
-
         setSaving(true);
 
-        let payload: Record<string, any> = {
-            organization_id: selectedOrganization.id,
+        const orgId = selectedOrganization.id;
+        const errors: string[] = [];
+
+        // Helper: upsert a single program's settings row
+        const upsertProgram = async (programId: string, payload: Record<string, unknown>) => {
+            const { error } = await supabase
+                .from('program_settings')
+                .upsert(
+                    { program_id: programId, organization_id: orgId, ...payload },
+                    { onConflict: 'program_id,organization_id' }
+                );
+            if (error) errors.push(error.message);
         };
 
         if (isDaycare) {
-            // Daycare-specific fields
-            payload = {
-                ...payload,
+            // Daycare: single program with open/close/late_pickup_fee
+            const progId = kgProgramId || elemProgramId;
+            if (progId) await upsertProgram(progId, {
                 open_time: openTime,
                 close_time: closeTime,
-                late_pickup_fee: parseFloat(latePickupFee)
-            };
+                late_pickup_fee: parseFloat(latePickupFee),
+            });
         } else {
-            // School-specific fields
-            payload = {
-                ...payload,
-                cutoff_time_kg: cutoffTimeKg,
-                cutoff_time_elementary: cutoffTimeElementary,
-                dropoff_time_kg: dropoffTimeKg,
-                dropoff_time_elementary: dropoffTimeElementary,
-                pickup_time_kg: pickupTimeKg,
-                pickup_time_elementary: pickupTimeElementary,
-                extended_care_rate_monthly: parseFloat(extendedCareRate)
-            };
+            // School: KG program → KG times, Elementary → Elementary times
+            const sharedRate = parseFloat(extendedCareRate);
+            if (kgProgramId) await upsertProgram(kgProgramId, {
+                cutoff_time: cutoffTimeKg,
+                dropoff_time: dropoffTimeKg,
+                pickup_time: pickupTimeKg,
+                extended_care_rate_monthly: sharedRate,
+                open_time: openTime,
+                close_time: closeTime,
+                late_pickup_fee: parseFloat(latePickupFee),
+            });
+            if (elemProgramId) await upsertProgram(elemProgramId, {
+                cutoff_time: cutoffTimeElementary,
+                dropoff_time: dropoffTimeElementary,
+                pickup_time: pickupTimeElementary,
+                extended_care_rate_monthly: sharedRate,
+                open_time: openTime,
+                close_time: closeTime,
+                late_pickup_fee: parseFloat(latePickupFee),
+            });
         }
 
-        let result;
-        if (settingsId) {
-            result = await supabase.from('school_settings').update(payload).eq('id', settingsId);
-        } else {
-            result = await supabase.from('school_settings').insert([payload]).select().single();
-            if (result.data) setSettingsId(result.data.id);
-        }
-
-        if (result.error) {
-            alert('Error saving settings: ' + result.error.message);
+        if (errors.length > 0) {
+            alert('Error saving settings:\n' + errors.join('\n'));
         } else {
             alert('Settings saved successfully!');
         }

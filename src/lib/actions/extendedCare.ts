@@ -63,28 +63,10 @@ const dayIndexMap: { [key: string]: number } = { 'Mon': 1, 'Tue': 2, 'Wed': 3, '
 export async function calculateExtendedCareFee(req: CalculationRequest): Promise<CalculationResult> {
     const supabase = await createClient();
     console.log('Calculating Extended Care Fee for:', req.organizationId);
-    // 1. Fetch Settings
-    const { data: settings } = await supabase
-        .from('school_settings')
-        .select('*')
-        .eq('organization_id', req.organizationId)
-        .single();
-
-    if (!settings) throw new Error('School settings not found. Please configure them in Settings.');
-
-    const rateMonthly = Number(settings.extended_care_rate_monthly) || 80;
-    const ratePerCyclePerDay = rateMonthly / 5; // e.g., $16
-
-    // Regular Times
-    const regDropOffKg = settings.dropoff_time_kg || '08:45';
-    const regDropOffEl = settings.dropoff_time_elementary || '08:15';
-    const regPickupKg = settings.pickup_time_kg || '15:30';
-    const regPickupEl = settings.pickup_time_elementary || '15:15';
-
-    // 2. Fetch Student Info (Grade for KG/Elem distinction)
+    // 1. Fetch student's active enrollment → grade → program_id
     const { data: enrollment } = await supabase
         .from('enrollments')
-        .select('grade:grades(name), start_date, end_date')
+        .select('grade:grades(name, program_id), start_date, end_date')
         .eq('student_id', req.studentId)
         .eq('status', 'ACTIVE')
         .maybeSingle();
@@ -92,16 +74,31 @@ export async function calculateExtendedCareFee(req: CalculationRequest): Promise
     const grade = (enrollment && 'grade' in enrollment)
         ? (Array.isArray(enrollment.grade) ? enrollment.grade[0] : enrollment.grade)
         : null;
-    const isKg = grade?.name?.toUpperCase().includes('K') || false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const programId: string | null = (grade as any)?.program_id ?? null;
+
+    if (!programId) throw new Error('Could not determine program for student. Check enrollment.');
+
+    // 2. Fetch Settings from program_settings (per-program flat columns)
+    const { data: settings } = await supabase
+        .from('program_settings')
+        .select('*')
+        .eq('program_id', programId)
+        .eq('organization_id', req.organizationId)
+        .single();
+
+    if (!settings) throw new Error('Program settings not found. Please configure them in Settings.');
+
+    const rateMonthly = Number(settings.extended_care_rate_monthly) || 80;
+    const ratePerCyclePerDay = rateMonthly / 5; // e.g., $16
+
+    // Each program row already holds the correct times for that grade level.
+    // No KG vs Elementary branching needed — program_settings is per-program.
+    const regDropOff = settings.dropoff_time || '08:30';
+    let regPickup = settings.pickup_time || '15:20';
 
     // Validate enrollment dates against billing month
-    // If enrollment doesn't look valid for this month, we might technically throw or return 0?
-    // For now, we assume if they are asking for calculation, we proceed, but maybe log warning?
-    // Or we could check if start_date > monthEnd or end_date < monthStart.
-    // Let's just use the grade found.
-
-    const regDropOff = isKg ? regDropOffKg : regDropOffEl;
-    let regPickup = isKg ? regPickupKg : regPickupEl;
+    const isKg = grade?.name?.toUpperCase().includes('K') || false; // kept for any downstream logic
 
     // Taxi Logic
     if (req.transportMode === 'TAXI') {
