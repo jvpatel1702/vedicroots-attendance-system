@@ -6,31 +6,94 @@
 import { useQuery } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabaseClient';
 
+/** Use this as selectedYear to fetch all students in the org (any year, including no enrollment). */
+export const ALL_YEARS_VALUE = 'all';
+
 // ── Students List ───────────────────────────────────────────────────────────
 
 export function useStudents(orgId: string | undefined, selectedYear: string) {
     const supabase = createClient();
+    const isAllYears = selectedYear === ALL_YEARS_VALUE;
+
     return useQuery({
         queryKey: ['students', orgId, selectedYear],
         enabled: !!orgId && !!selectedYear,
         queryFn: async () => {
-            // 1. Get classrooms for this org
+            // 1. Get classrooms for this org (used to scope enrollments to org)
             const { data: locations } = await supabase
                 .from('locations')
                 .select('id')
                 .eq('organization_id', orgId!);
 
-            if (!locations || locations.length === 0) return [];
+            const classroomIds: string[] = [];
+            if (locations && locations.length > 0) {
+                const { data: orgClassrooms } = await supabase
+                    .from('classrooms')
+                    .select('id')
+                    .in('location_id', locations.map((l: any) => l.id));
+                classroomIds.push(...(orgClassrooms?.map((c: any) => c.id) || []));
+            }
 
-            const { data: orgClassrooms } = await supabase
-                .from('classrooms')
-                .select('id')
-                .in('location_id', locations.map((l: any) => l.id));
+            if (isAllYears) {
+                // All Years: all students in org (by person.organization_id), with optional enrollments.
+                // Includes students with no enrollments ("no year assigned").
+                const { data, error } = await supabase
+                    .from('students')
+                    .select(`
+                        id,
+                        student_number,
+                        gender,
+                        dob,
+                        person:persons!inner (
+                            first_name,
+                            last_name,
+                            dob,
+                            photo_url,
+                            organization_id
+                        ),
+                        medical:student_medical (
+                            allergies,
+                            medical_conditions,
+                            medications,
+                            doctor_name,
+                            doctor_phone
+                        ),
+                        student_guardians (
+                            is_primary,
+                            guardians (
+                                email,
+                                phone
+                            )
+                        ),
+                        enrollments (
+                            status,
+                            classroom_id,
+                            grade_id,
+                            academic_year_id,
+                            classrooms (id, name),
+                            grades (id, name, order),
+                            academic_years (id, name)
+                        )
+                    `)
+                    .eq('persons.organization_id', orgId!);
 
-            const classroomIds = orgClassrooms?.map((c: any) => c.id) || [];
+                if (error) throw error;
+
+                const list = (data as any[]).filter((s: any) => s.person) ?? [];
+                // Restrict enrollments to org classrooms only; sort by academic_year so [0] can be "latest"
+                return list.map((s: any) => {
+                    if (!s.enrollments || !Array.isArray(s.enrollments)) return { ...s, enrollments: [] };
+                    const inOrg = classroomIds.length === 0
+                        ? []
+                        : s.enrollments.filter((e: any) => e?.classroom_id && classroomIds.includes(e.classroom_id));
+                    return { ...s, enrollments: inOrg };
+                });
+            }
+
+            // Single year: only students enrolled in that year in org classrooms
             if (classroomIds.length === 0) return [];
 
-            let query = supabase
+            const query = supabase
                 .from('students')
                 .select(`
                     id,

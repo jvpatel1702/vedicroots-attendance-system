@@ -25,7 +25,7 @@ interface SidebarProps {
 
 /**
  * Sidebar component for the application.
- * 
+ *
  * Displays the application logo, dashboard switcher, and a list of navigation links.
  * It filters the navigation items based on the current organization type.
  */
@@ -40,7 +40,7 @@ export default function Sidebar({ items, organizationType }: SidebarProps) {
     });
 
     return (
-        <aside className="w-64 bg-white border-r border-gray-200 flex-1 flex flex-col">
+        <aside className="w-full bg-white border-r border-gray-200 flex-1 flex flex-col min-w-0">
             {/* Logo Header */}
             <div className="px-6 py-6 border-b border-gray-200">
                 <div className="flex items-center gap-3">

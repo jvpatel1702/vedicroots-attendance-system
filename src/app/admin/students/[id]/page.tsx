@@ -3,8 +3,33 @@
 import { useState, useEffect, useCallback, use } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { useOrganization } from '@/context/OrganizationContext';
-import { ArrowLeft, Save, User, Heart, GraduationCap, Calendar, AlertCircle, Plus, Trash2, Users, Clock, BookOpen } from 'lucide-react';
+import {
+    ArrowLeft,
+    Save,
+    User,
+    Heart,
+    GraduationCap,
+    Calendar,
+    AlertCircle,
+    Plus,
+    Trash2,
+    Users,
+    Clock,
+    BookOpen,
+} from 'lucide-react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import {
+    Select as ShadcnSelect,
+    SelectTrigger,
+    SelectValue,
+    SelectContent,
+    SelectItem,
+} from '@/components/ui/select';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 interface Guardian {
     id: string;
@@ -71,6 +96,7 @@ interface ElectiveOffering {
 interface StudentData {
     id: string;
     student_number: string;
+    gender: string | null;
     person: {
         id: string;
         first_name: string;
@@ -110,6 +136,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [dob, setDob] = useState('');
+    const [gender, setGender] = useState('');
 
     // Form state - Medical Info
     const [allergies, setAllergies] = useState('');
@@ -169,6 +196,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
             .select(`
                 id,
                 student_number,
+                gender,
                 person:persons (id, first_name, last_name, dob, photo_url),
                 medical:student_medical (allergies, medical_conditions, medications, doctor_name, doctor_phone)
             `)
@@ -180,6 +208,7 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         if (studentData) {
             const typedData = studentData as unknown as StudentData;
             setStudent(typedData);
+            setGender(typedData.gender ?? '');
             const p = typedData.person;
             if (p) {
                 setFirstName(p.first_name || '');
@@ -320,11 +349,20 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
     const handleSavePersonInfo = async () => {
         if (!student?.person?.id) return;
         setSaving(true);
-        const { error } = await supabase
+        const { error: personError } = await supabase
             .from('persons')
             .update({ first_name: firstName, last_name: lastName, dob: dob || null })
             .eq('id', student.person.id);
-        if (error) alert('Error: ' + error.message);
+        if (personError) {
+            alert('Error saving person: ' + personError.message);
+            setSaving(false);
+            return;
+        }
+        const { error: studentError } = await supabase
+            .from('students')
+            .update({ gender: gender && gender !== '' ? gender : null })
+            .eq('id', student.id);
+        if (studentError) alert('Error saving gender: ' + studentError.message);
         setSaving(false);
     };
 
@@ -510,9 +548,15 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
         <div className="space-y-6">
             {/* Header */}
             <div className="flex items-center gap-4">
-                <Link href="/admin/students" className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                    <ArrowLeft size={20} className="text-gray-600" />
-                </Link>
+                <Button
+                    asChild
+                    variant="ghost"
+                    className="h-auto px-2 py-2 rounded-lg hover:bg-muted"
+                >
+                    <Link href="/admin/students">
+                        <ArrowLeft size={20} className="text-muted-foreground" />
+                    </Link>
+                </Button>
                 <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-xl border-2 border-indigo-200">
                         {firstName[0] || '?'}
@@ -524,480 +568,803 @@ export default function StudentDetailPage({ params }: { params: Promise<{ id: st
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Person Info */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                        <User size={18} className="text-indigo-600" /> Personal Information
-                    </h2>
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-                                <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg p-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-                                <input type="text" value={lastName} onChange={e => setLastName(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg p-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-                            <input type="date" value={dob} onChange={e => setDob(e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg p-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                        </div>
-                        <button onClick={handleSavePersonInfo} disabled={saving}
-                            className="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors">
-                            <Save size={16} /> {saving ? 'Saving...' : 'Save Personal Info'}
-                        </button>
-                    </div>
-                </div>
+            {/* Main two-column layout: 25% left sidebar | 75% right content */}
+            <div className="flex gap-6 items-start">
 
-                {/* Guardians */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                            <Users size={18} className="text-purple-600" /> Guardians / Parents
-                        </h2>
-                        <button onClick={() => setShowAddGuardian(true)} className="text-purple-600 hover:bg-purple-50 p-1 rounded">
-                            <Plus size={18} />
-                        </button>
-                    </div>
-                    {guardians.length === 0 ? (
-                        <p className="text-sm text-gray-400 italic">No guardians on file.</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {guardians.map(g => (
-                                <div key={g.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                    <div>
-                                        <p className="font-medium text-gray-900">{g.first_name} {g.last_name} <span className="text-xs text-gray-500">({g.relationship})</span></p>
-                                        <p className="text-xs text-gray-500">{g.phone} {g.email && `• ${g.email}`}</p>
-                                    </div>
-                                    <button onClick={() => handleRemoveGuardian(g.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
+                {/* LEFT COLUMN (25%) — Personal Info & Medical Info */}
+                <div className="w-1/4 shrink-0 space-y-6">
+
+                    {/* Personal Info */}
+                    <Card>
+                        <CardHeader className="pb-4">
+                            <CardTitle className="flex items-center gap-2 text-base font-bold">
+                                <User size={18} className="text-indigo-600" /> Personal Information
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                <div>
+                                    <Label className="mb-1 block text-sm text-gray-700">First Name</Label>
+                                    <Input
+                                        type="text"
+                                        value={firstName}
+                                        onChange={e => setFirstName(e.target.value)}
+                                    />
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                    {showAddGuardian && (
-                        <div className="mt-4 p-4 bg-purple-50 rounded-lg space-y-3">
-                            <div className="grid grid-cols-2 gap-2">
-                                <input placeholder="First Name" value={newGuardian.first_name} onChange={e => setNewGuardian({ ...newGuardian, first_name: e.target.value })}
-                                    className="border border-gray-300 rounded p-2 text-sm" />
-                                <input placeholder="Last Name" value={newGuardian.last_name} onChange={e => setNewGuardian({ ...newGuardian, last_name: e.target.value })}
-                                    className="border border-gray-300 rounded p-2 text-sm" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                                <input placeholder="Phone" value={newGuardian.phone} onChange={e => setNewGuardian({ ...newGuardian, phone: e.target.value })}
-                                    className="border border-gray-300 rounded p-2 text-sm" />
-                                <input placeholder="Email" value={newGuardian.email} onChange={e => setNewGuardian({ ...newGuardian, email: e.target.value })}
-                                    className="border border-gray-300 rounded p-2 text-sm" />
-                            </div>
-                            <select value={newGuardian.relationship} onChange={e => setNewGuardian({ ...newGuardian, relationship: e.target.value })}
-                                className="w-full border border-gray-300 rounded p-2 text-sm bg-white">
-                                <option>Parent</option><option>Mother</option><option>Father</option><option>Guardian</option><option>Grandparent</option><option>Other</option>
-                            </select>
-                            <div className="flex gap-2">
-                                <button onClick={handleAddGuardian} disabled={saving} className="flex-1 bg-purple-600 text-white py-2 rounded text-sm font-medium">Add Guardian</button>
-                                <button onClick={() => setShowAddGuardian(false)} className="flex-1 border border-gray-300 py-2 rounded text-sm">Cancel</button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Enrollments */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                        <GraduationCap size={18} className="text-green-600" /> Enrollments
-                    </h2>
-                    <button onClick={() => setShowAddEnrollment(true)} className="text-green-600 hover:bg-green-50 p-1 rounded">
-                        <Plus size={18} />
-                    </button>
-                </div>
-                {enrollments.length === 0 ? (
-                    <p className="text-sm text-gray-400 italic">No enrollments found.</p>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-4 py-2 text-left text-gray-600 font-medium">Classroom</th>
-                                    <th className="px-4 py-2 text-left text-gray-600 font-medium">Grade</th>
-                                    <th className="px-4 py-2 text-left text-gray-600 font-medium">Year</th>
-                                    <th className="px-4 py-2 text-left text-gray-600 font-medium">Dates</th>
-                                    <th className="px-4 py-2 text-left text-gray-600 font-medium">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {enrollments.map(e => (
-                                    <tr key={e.id}>
-                                        <td className="px-4 py-3 text-gray-900">{e.classrooms?.name || 'Unassigned'}</td>
-                                        <td className="px-4 py-3 text-gray-600">{e.grades?.name || 'N/A'}</td>
-                                        <td className="px-4 py-3 text-gray-600">{e.academic_years?.name || 'N/A'}</td>
-                                        <td className="px-4 py-3 text-gray-600 text-xs">
-                                            <div>Start: {e.start_date}</div>
-                                            {e.end_date && <div>End: {e.end_date}</div>}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <select value={e.status} onChange={ev => handleUpdateEnrollmentStatus(e.id, ev.target.value)}
-                                                className={`text-xs px-2 py-1 rounded font-medium border-0 ${e.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                                                <option value="ACTIVE">Active</option>
-                                                <option value="INACTIVE">Inactive</option>
-                                                <option value="GRADUATED">Graduated</option>
-                                                <option value="WITHDRAWN">Withdrawn</option>
-                                            </select>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-                {showAddEnrollment && (
-                    <div className="mt-4 p-4 bg-green-50 rounded-lg space-y-3">
-                        <div className="grid grid-cols-3 gap-3">
-                            <select value={newEnrollment.classroom_id} onChange={e => setNewEnrollment({ ...newEnrollment, classroom_id: e.target.value })}
-                                className="border border-gray-300 rounded p-2 text-sm bg-white">
-                                <option value="">Select Classroom</option>
-                                {classrooms.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
-                            <select value={newEnrollment.grade_id} onChange={e => setNewEnrollment({ ...newEnrollment, grade_id: e.target.value })}
-                                className="border border-gray-300 rounded p-2 text-sm bg-white">
-                                <option value="">Select Grade</option>
-                                {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                            </select>
-                            <select value={newEnrollment.academic_year_id} onChange={e => setNewEnrollment({ ...newEnrollment, academic_year_id: e.target.value })}
-                                className="border border-gray-300 rounded p-2 text-sm bg-white">
-                                <option value="">Select Year</option>
-                                {academicYears.map(y => <option key={y.id} value={y.id}>{y.name} {y.is_active ? '(Active)' : ''}</option>)}
-                            </select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
-                                <input
-                                    type="date"
-                                    value={newEnrollment.start_date}
-                                    onChange={e => setNewEnrollment({ ...newEnrollment, start_date: e.target.value })}
-                                    className="border border-gray-300 rounded p-2 text-sm w-full"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">End Date</label>
-                                <input
-                                    type="date"
-                                    value={newEnrollment.end_date}
-                                    onChange={e => setNewEnrollment({ ...newEnrollment, end_date: e.target.value })}
-                                    className="border border-gray-300 rounded p-2 text-sm w-full"
-                                />
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={handleAddEnrollment} disabled={saving} className="flex-1 bg-green-600 text-white py-2 rounded text-sm font-medium">Add Enrollment</button>
-                            <button onClick={() => setShowAddEnrollment(false)} className="flex-1 border border-gray-300 py-2 rounded text-sm">Cancel</button>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Extended Care Subscription */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                        <Clock size={18} className="text-orange-600" /> Extended Care
-                    </h2>
-                    {!activeEcSubscription && (
-                        <button onClick={() => setShowStartEC(true)} className="text-orange-600 hover:bg-orange-50 px-3 py-1 rounded text-sm font-medium flex items-center gap-1">
-                            <Plus size={16} /> Start Service
-                        </button>
-                    )}
-                </div>
-
-                {/* Active Subscription */}
-                {activeEcSubscription ? (
-                    <div className="p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                        ✓ ACTIVE
-                                    </span>
-                                    <span className="text-sm text-gray-600">since {activeEcSubscription.start_date}</span>
+                                <div>
+                                    <Label className="mb-1 block text-sm text-gray-700">Last Name</Label>
+                                    <Input
+                                        type="text"
+                                        value={lastName}
+                                        onChange={e => setLastName(e.target.value)}
+                                    />
                                 </div>
-                                <p className="text-sm text-gray-700">
-                                    Drop-off: <strong>{activeEcSubscription.drop_off_time || 'N/A'}</strong> |
-                                    Pick-up: <strong>{activeEcSubscription.pickup_time || 'N/A'}</strong>
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                    Days: {activeEcSubscription.days_of_week?.join(', ') || 'Weekdays'}
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => setShowStopEC(true)}
-                                className="px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 transition-colors"
-                            >
-                                Stop Service
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <p className="text-sm text-gray-400 italic mb-4">No active extended care subscription.</p>
-                )}
-
-                {/* Stop Service Form */}
-                {showStopEC && activeEcSubscription && (
-                    <div className="p-4 bg-red-50 rounded-lg space-y-3 mb-4">
-                        <p className="text-sm font-medium text-gray-700">Set end date for this subscription:</p>
-                        <input type="date" value={stopDate} onChange={e => setStopDate(e.target.value)}
-                            className="border border-gray-300 rounded p-2 text-sm w-full" />
-                        <div className="flex gap-2">
-                            <button onClick={handleStopEC} disabled={saving} className="flex-1 bg-red-600 text-white py-2 rounded text-sm font-medium">
-                                Confirm Stop
-                            </button>
-                            <button onClick={() => setShowStopEC(false)} className="flex-1 border border-gray-300 py-2 rounded text-sm">Cancel</button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Start Service Form */}
-                {showStartEC && (
-                    <div className="p-4 bg-orange-50 rounded-lg space-y-4 mb-4">
-                        {/* Start Date */}
-                        <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
-                            <input type="date" value={newEC.start_date} onChange={e => setNewEC({ ...newEC, start_date: e.target.value })}
-                                className="border border-gray-300 rounded p-2 text-sm w-full max-w-xs" />
-                        </div>
-
-                        {/* Before Care Toggle */}
-                        <div className="flex items-center gap-4">
-                            <button
-                                type="button"
-                                onClick={() => setNewEC({ ...newEC, before_care: !newEC.before_care })}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${newEC.before_care ? 'bg-orange-600' : 'bg-gray-300'
-                                    }`}
-                            >
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${newEC.before_care ? 'translate-x-6' : 'translate-x-1'
-                                    }`} />
-                            </button>
-                            <span className="text-sm font-medium text-gray-700">Before Care (Drop-off after 7:00 AM)</span>
-                            {newEC.before_care && (
-                                <input type="time" value={newEC.drop_off_time} onChange={e => setNewEC({ ...newEC, drop_off_time: e.target.value })}
-                                    min="07:00" className="border border-gray-300 rounded p-2 text-sm" />
-                            )}
-                        </div>
-
-                        {/* After Care Toggle */}
-                        <div className="flex items-center gap-4">
-                            <button
-                                type="button"
-                                onClick={() => setNewEC({ ...newEC, after_care: !newEC.after_care })}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${newEC.after_care ? 'bg-orange-600' : 'bg-gray-300'
-                                    }`}
-                            >
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${newEC.after_care ? 'translate-x-6' : 'translate-x-1'
-                                    }`} />
-                            </button>
-                            <span className="text-sm font-medium text-gray-700">After Care (Pick-up before 6:00 PM)</span>
-                            {newEC.after_care && (
-                                <input type="time" value={newEC.pickup_time} onChange={e => setNewEC({ ...newEC, pickup_time: e.target.value })}
-                                    max="18:00" className="border border-gray-300 rounded p-2 text-sm" />
-                            )}
-                        </div>
-
-                        {/* Days of Week */}
-                        <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-2">Days of Week</label>
-                            <div className="flex gap-2">
-                                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(day => (
-                                    <button
-                                        key={day}
-                                        type="button"
-                                        onClick={() => {
-                                            const days = newEC.days_of_week.includes(day)
-                                                ? newEC.days_of_week.filter(d => d !== day)
-                                                : [...newEC.days_of_week, day];
-                                            setNewEC({ ...newEC, days_of_week: days });
-                                        }}
-                                        className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${newEC.days_of_week.includes(day)
-                                            ? 'bg-orange-600 text-white'
-                                            : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
-                                            }`}
+                                <div>
+                                    <Label className="mb-1 block text-sm text-gray-700">Date of Birth</Label>
+                                    <Input
+                                        type="date"
+                                        value={dob}
+                                        onChange={e => setDob(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="mb-1 block text-sm text-gray-700">Gender</Label>
+                                    <ShadcnSelect
+                                        value={gender || ''}
+                                        onValueChange={value => setGender(value)}
                                     >
-                                        {day}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="flex gap-2 pt-2">
-                            <button onClick={handleStartEC} disabled={saving} className="flex-1 bg-orange-600 text-white py-2 rounded text-sm font-medium">
-                                Start Extended Care
-                            </button>
-                            <button onClick={() => setShowStartEC(false)} className="flex-1 border border-gray-300 py-2 rounded text-sm">Cancel</button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Subscription History */}
-                {ecSubscriptions.filter(s => s.end_date).length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">Past Subscriptions</h3>
-                        <div className="space-y-2">
-                            {ecSubscriptions.filter(s => s.end_date).map(sub => (
-                                <div key={sub.id} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
-                                    <span className="text-gray-700">{sub.start_date} → {sub.end_date}</span>
-                                    <span className="text-gray-500 text-xs">{sub.days_of_week?.join(', ')}</span>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select gender" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Male">Male</SelectItem>
+                                            <SelectItem value="Female">Female</SelectItem>
+                                            <SelectItem value="Other">Other</SelectItem>
+                                        </SelectContent>
+                                    </ShadcnSelect>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
+                                <Button
+                                    onClick={handleSavePersonInfo}
+                                    disabled={saving}
+                                    className="w-full bg-indigo-600 hover:bg-indigo-700"
+                                >
+                                    <Save size={16} /> {saving ? 'Saving...' : 'Save Personal Info'}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-            {/* Electives */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                        <BookOpen size={18} className="text-violet-600" /> Elective Classes
-                    </h2>
-                    <button onClick={() => setShowAddElective(true)} className="text-violet-600 hover:bg-violet-50 p-1 rounded">
-                        <Plus size={18} />
-                    </button>
-                </div>
-                {electiveEnrollments.length === 0 ? (
-                    <p className="text-sm text-gray-400 italic">No elective enrollments.</p>
-                ) : (
-                    <div className="space-y-2">
-                        {electiveEnrollments.map(ee => (
-                            <div key={ee.id} className={`flex items-center justify-between p-3 rounded-lg ${ee.status === 'ACTIVE' ? 'bg-violet-50' : 'bg-gray-50'}`}>
+                    {/* Medical Info */}
+                    <Card>
+                        <CardHeader className="pb-4">
+                            <CardTitle className="flex items-center gap-2 text-base font-bold">
+                                <Heart size={18} className="text-red-500" /> Medical Information
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
                                 <div>
-                                    <p className="font-medium text-gray-900">{ee.offering?.subject?.name || 'Unknown'}</p>
-                                    <p className="text-xs text-gray-500">{ee.offering?.schedule_day} @ {ee.offering?.schedule_start_time} • Started: {ee.start_date}</p>
+                                    <Label className="block text-sm font-medium text-gray-700 mb-1">Allergies</Label>
+                                    <Textarea
+                                        value={allergies}
+                                        onChange={e => setAllergies(e.target.value)}
+                                        placeholder="Known allergies..."
+                                        className="h-24"
+                                    />
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <span className={`text-xs px-2 py-1 rounded font-medium ${ee.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
-                                        {ee.status}
-                                    </span>
-                                    {ee.status === 'ACTIVE' && (
-                                        <button onClick={() => handleRemoveElective(ee.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-                {showAddElective && (
-                    <div className="mt-4 p-4 bg-violet-50 rounded-lg space-y-3">
-                        <select value={newElective.offering_id} onChange={e => setNewElective({ ...newElective, offering_id: e.target.value })}
-                            className="w-full border border-gray-300 rounded p-2 text-sm bg-white">
-                            <option value="">Select Elective Class</option>
-                            {electiveOfferings.map(o => (
-                                <option key={o.id} value={o.id}>{o.subject?.name} - {o.schedule_day} @ {o.schedule_start_time}</option>
-                            ))}
-                        </select>
-                        <input type="date" value={newElective.start_date} onChange={e => setNewElective({ ...newElective, start_date: e.target.value })}
-                            className="w-full border border-gray-300 rounded p-2 text-sm" />
-                        <div className="flex gap-2">
-                            <button onClick={handleAddElective} disabled={saving} className="flex-1 bg-violet-600 text-white py-2 rounded text-sm font-medium">Enroll in Elective</button>
-                            <button onClick={() => setShowAddElective(false)} className="flex-1 border border-gray-300 py-2 rounded text-sm">Cancel</button>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Vacations */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                        <Calendar size={18} className="text-blue-600" /> Vacation Log
-                    </h2>
-                    <button onClick={() => setShowAddVacation(true)} className="text-blue-600 hover:bg-blue-50 p-1 rounded">
-                        <Plus size={18} />
-                    </button>
-                </div>
-                {vacations.length === 0 ? (
-                    <p className="text-sm text-gray-400 italic">No vacations scheduled.</p>
-                ) : (
-                    <div className="space-y-2">
-                        {vacations.map(v => (
-                            <div key={v.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                                 <div>
-                                    <p className="font-medium text-gray-900">{v.start_date} to {v.end_date}</p>
-                                    {v.reason && <p className="text-xs text-gray-500">{v.reason}</p>}
+                                    <Label className="block text-sm font-medium text-gray-700 mb-1">Medical Conditions</Label>
+                                    <Textarea
+                                        value={medicalConditions}
+                                        onChange={e => setMedicalConditions(e.target.value)}
+                                        placeholder="Medical conditions..."
+                                        className="h-24"
+                                    />
                                 </div>
-                                <button onClick={() => handleRemoveVacation(v.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
+                                <div>
+                                    <Label className="block text-sm font-medium text-gray-700 mb-1">Medications</Label>
+                                    <Textarea
+                                        value={medications}
+                                        onChange={e => setMedications(e.target.value)}
+                                        placeholder="Current medications..."
+                                        className="h-24"
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="block text-sm font-medium text-gray-700 mb-1">Doctor Name</Label>
+                                    <Input
+                                        type="text"
+                                        value={doctorName}
+                                        onChange={e => setDoctorName(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="block text-sm font-medium text-gray-700 mb-1">Doctor Phone</Label>
+                                    <Input
+                                        type="text"
+                                        value={doctorPhone}
+                                        onChange={e => setDoctorPhone(e.target.value)}
+                                    />
+                                </div>
+                                {(allergies || medicalConditions) && (
+                                    <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 flex items-start gap-2">
+                                        <AlertCircle className="text-amber-600 shrink-0 mt-0.5" size={16} />
+                                        <p className="text-sm text-amber-800">
+                                            This student has medical information on file. Please ensure all staff are aware.
+                                        </p>
+                                    </div>
+                                )}
+                                <Button
+                                    onClick={handleSaveMedicalInfo}
+                                    disabled={saving}
+                                    className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold flex items-center gap-2"
+                                >
+                                    <Save size={16} /> {saving ? 'Saving...' : 'Save Medical Info'}
+                                </Button>
                             </div>
-                        ))}
-                    </div>
-                )}
-                {showAddVacation && (
-                    <div className="mt-4 p-4 bg-blue-50 rounded-lg space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
-                            <input type="date" placeholder="Start Date" value={newVacation.start_date} onChange={e => setNewVacation({ ...newVacation, start_date: e.target.value })}
-                                className="border border-gray-300 rounded p-2 text-sm" />
-                            <input type="date" placeholder="End Date" value={newVacation.end_date} onChange={e => setNewVacation({ ...newVacation, end_date: e.target.value })}
-                                className="border border-gray-300 rounded p-2 text-sm" />
-                        </div>
-                        <input placeholder="Reason (optional)" value={newVacation.reason} onChange={e => setNewVacation({ ...newVacation, reason: e.target.value })}
-                            className="w-full border border-gray-300 rounded p-2 text-sm" />
-                        <div className="flex gap-2">
-                            <button onClick={handleAddVacation} disabled={saving} className="flex-1 bg-blue-600 text-white py-2 rounded text-sm font-medium">Add Vacation</button>
-                            <button onClick={() => setShowAddVacation(false)} className="flex-1 border border-gray-300 py-2 rounded text-sm">Cancel</button>
-                        </div>
-                    </div>
-                )}
-            </div>
+                        </CardContent>
+                    </Card>
 
-            {/* Medical Info */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <Heart size={18} className="text-red-500" /> Medical Information
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Allergies</label>
-                        <textarea value={allergies} onChange={e => setAllergies(e.target.value)} placeholder="Known allergies..."
-                            className="w-full border border-gray-300 rounded-lg p-2 text-gray-900 focus:ring-2 focus:ring-red-300 outline-none h-24" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Medical Conditions</label>
-                        <textarea value={medicalConditions} onChange={e => setMedicalConditions(e.target.value)} placeholder="Medical conditions..."
-                            className="w-full border border-gray-300 rounded-lg p-2 text-gray-900 focus:ring-2 focus:ring-red-300 outline-none h-24" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Medications</label>
-                        <textarea value={medications} onChange={e => setMedications(e.target.value)} placeholder="Current medications..."
-                            className="w-full border border-gray-300 rounded-lg p-2 text-gray-900 focus:ring-2 focus:ring-red-300 outline-none h-24" />
-                    </div>
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Doctor Name</label>
-                            <input type="text" value={doctorName} onChange={e => setDoctorName(e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg p-2 text-gray-900 focus:ring-2 focus:ring-red-300 outline-none" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Doctor Phone</label>
-                            <input type="text" value={doctorPhone} onChange={e => setDoctorPhone(e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg p-2 text-gray-900 focus:ring-2 focus:ring-red-300 outline-none" />
-                        </div>
-                    </div>
-                </div>
-                {(allergies || medicalConditions) && (
-                    <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-200 flex items-start gap-2">
-                        <AlertCircle className="text-amber-600 shrink-0 mt-0.5" size={16} />
-                        <p className="text-sm text-amber-800">This student has medical information on file. Please ensure all staff are aware.</p>
-                    </div>
-                )}
-                <button onClick={handleSaveMedicalInfo} disabled={saving}
-                    className="mt-4 bg-red-600 text-white px-6 py-2 rounded-lg font-semibold flex items-center gap-2 hover:bg-red-700 transition-colors">
-                    <Save size={16} /> {saving ? 'Saving...' : 'Save Medical Info'}
-                </button>
-            </div>
+                </div>{/* END LEFT COLUMN */}
+
+                {/* RIGHT COLUMN (75%) — Guardians, Enrollments, EC, Electives, Vacations */}
+                <div className="flex-1 min-w-0 space-y-6">
+
+                    {/* Guardians */}
+                    <Card>
+                        <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0">
+                            <CardTitle className="flex items-center gap-2 text-base font-bold">
+                                <Users size={18} className="text-purple-600" /> Guardians / Parents
+                            </CardTitle>
+                            <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setShowAddGuardian(true)}
+                                className="text-purple-600 hover:bg-purple-50"
+                            >
+                                <Plus size={18} />
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            {guardians.length === 0 ? (
+                                <p className="text-sm text-gray-400 italic">No guardians on file.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {guardians.map(g => (
+                                        <div key={g.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                            <div>
+                                                <p className="font-medium text-gray-900">
+                                                    {g.first_name} {g.last_name}{' '}
+                                                    <span className="text-xs text-gray-500">({g.relationship})</span>
+                                                </p>
+                                                <p className="text-xs text-gray-500">
+                                                    {g.phone} {g.email && `• ${g.email}`}
+                                                </p>
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => handleRemoveGuardian(g.id)}
+                                                className="text-red-500 hover:text-red-700"
+                                            >
+                                                <Trash2 size={16} />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {showAddGuardian && (
+                                <div className="mt-4 p-4 bg-purple-50 rounded-lg space-y-3">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Input
+                                            placeholder="First Name"
+                                            value={newGuardian.first_name}
+                                            onChange={e => setNewGuardian({ ...newGuardian, first_name: e.target.value })}
+                                        />
+                                        <Input
+                                            placeholder="Last Name"
+                                            value={newGuardian.last_name}
+                                            onChange={e => setNewGuardian({ ...newGuardian, last_name: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Input
+                                            placeholder="Phone"
+                                            value={newGuardian.phone}
+                                            onChange={e => setNewGuardian({ ...newGuardian, phone: e.target.value })}
+                                        />
+                                        <Input
+                                            placeholder="Email"
+                                            value={newGuardian.email}
+                                            onChange={e => setNewGuardian({ ...newGuardian, email: e.target.value })}
+                                        />
+                                    </div>
+                                    <ShadcnSelect
+                                        value={newGuardian.relationship}
+                                        onValueChange={value => setNewGuardian({ ...newGuardian, relationship: value })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Relationship" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Parent">Parent</SelectItem>
+                                            <SelectItem value="Mother">Mother</SelectItem>
+                                            <SelectItem value="Father">Father</SelectItem>
+                                            <SelectItem value="Guardian">Guardian</SelectItem>
+                                            <SelectItem value="Grandparent">Grandparent</SelectItem>
+                                            <SelectItem value="Other">Other</SelectItem>
+                                        </SelectContent>
+                                    </ShadcnSelect>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            onClick={handleAddGuardian}
+                                            disabled={saving}
+                                            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium"
+                                        >
+                                            Add Guardian
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="flex-1 text-sm"
+                                            onClick={() => setShowAddGuardian(false)}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Enrollments */}
+                    <Card>
+                        <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0">
+                            <CardTitle className="flex items-center gap-2 text-base font-bold">
+                                <GraduationCap size={18} className="text-green-600" /> Enrollments
+                            </CardTitle>
+                            <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setShowAddEnrollment(true)}
+                                className="text-green-600 hover:bg-green-50"
+                            >
+                                <Plus size={18} />
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            {enrollments.length === 0 ? (
+                                <p className="text-sm text-gray-400 italic">No enrollments found.</p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-4 py-2 text-left text-gray-600 font-medium">Classroom</th>
+                                                <th className="px-4 py-2 text-left text-gray-600 font-medium">Grade</th>
+                                                <th className="px-4 py-2 text-left text-gray-600 font-medium">Year</th>
+                                                <th className="px-4 py-2 text-left text-gray-600 font-medium">Dates</th>
+                                                <th className="px-4 py-2 text-left text-gray-600 font-medium">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {enrollments.map(e => (
+                                                <tr key={e.id}>
+                                                    <td className="px-4 py-3 text-gray-900">{e.classrooms?.name || 'Unassigned'}</td>
+                                                    <td className="px-4 py-3 text-gray-600">{e.grades?.name || 'N/A'}</td>
+                                                    <td className="px-4 py-3 text-gray-600">{e.academic_years?.name || 'N/A'}</td>
+                                                    <td className="px-4 py-3 text-gray-600 text-xs">
+                                                        <div>Start: {e.start_date}</div>
+                                                        {e.end_date && <div>End: {e.end_date}</div>}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <ShadcnSelect
+                                                            value={e.status}
+                                                            onValueChange={value => handleUpdateEnrollmentStatus(e.id, value)}
+                                                        >
+                                                            <SelectTrigger className="h-7 text-xs px-2 py-1">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="ACTIVE">Active</SelectItem>
+                                                                <SelectItem value="INACTIVE">Inactive</SelectItem>
+                                                                <SelectItem value="GRADUATED">Graduated</SelectItem>
+                                                                <SelectItem value="WITHDRAWN">Withdrawn</SelectItem>
+                                                            </SelectContent>
+                                                        </ShadcnSelect>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                            {showAddEnrollment && (
+                                <div className="mt-4 p-4 bg-green-50 rounded-lg space-y-3">
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <ShadcnSelect
+                                            value={newEnrollment.classroom_id}
+                                            onValueChange={value => setNewEnrollment({ ...newEnrollment, classroom_id: value })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select Classroom" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {classrooms.map(c => (
+                                                    <SelectItem key={c.id} value={c.id}>
+                                                        {c.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </ShadcnSelect>
+                                        <ShadcnSelect
+                                            value={newEnrollment.grade_id}
+                                            onValueChange={value => setNewEnrollment({ ...newEnrollment, grade_id: value })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select Grade" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {grades.map(g => (
+                                                    <SelectItem key={g.id} value={g.id}>
+                                                        {g.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </ShadcnSelect>
+                                        <ShadcnSelect
+                                            value={newEnrollment.academic_year_id}
+                                            onValueChange={value => setNewEnrollment({ ...newEnrollment, academic_year_id: value })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select Year" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {academicYears.map(y => (
+                                                    <SelectItem key={y.id} value={y.id}>
+                                                        {y.name} {y.is_active ? '(Active)' : ''}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </ShadcnSelect>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <Label className="block text-xs font-medium text-gray-600 mb-1">Start Date</Label>
+                                            <Input
+                                                type="date"
+                                                value={newEnrollment.start_date}
+                                                onChange={e => setNewEnrollment({ ...newEnrollment, start_date: e.target.value })}
+                                                className="text-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="block text-xs font-medium text-gray-600 mb-1">End Date</Label>
+                                            <Input
+                                                type="date"
+                                                value={newEnrollment.end_date}
+                                                onChange={e => setNewEnrollment({ ...newEnrollment, end_date: e.target.value })}
+                                                className="text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            onClick={handleAddEnrollment}
+                                            disabled={saving}
+                                            className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium"
+                                        >
+                                            Add Enrollment
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="flex-1 text-sm"
+                                            onClick={() => setShowAddEnrollment(false)}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Extended Care Subscription */}
+                    <Card>
+                        <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0">
+                            <CardTitle className="flex items-center gap-2 text-base font-bold">
+                                <Clock size={18} className="text-orange-600" /> Extended Care
+                            </CardTitle>
+                            {!activeEcSubscription && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setShowStartEC(true)}
+                                    className="border-orange-200 text-orange-700 hover:bg-orange-50"
+                                >
+                                    <Plus size={16} /> Start Service
+                                </Button>
+                            )}
+                        </CardHeader>
+                        <CardContent>
+
+                            {/* Active Subscription */}
+                            {activeEcSubscription ? (
+                                <div className="p-4 bg-green-50 border border-green-200 rounded-lg mb-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                    ✓ ACTIVE
+                                                </span>
+                                                <span className="text-sm text-gray-600">since {activeEcSubscription.start_date}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-700">
+                                                Drop-off: <strong>{activeEcSubscription.drop_off_time || 'N/A'}</strong> |
+                                                Pick-up: <strong>{activeEcSubscription.pickup_time || 'N/A'}</strong>
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Days: {activeEcSubscription.days_of_week?.join(', ') || 'Weekdays'}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => setShowStopEC(true)}
+                                            className="px-4 py-2 border-red-200 bg-red-50 text-red-700 hover:bg-red-100 text-sm font-medium"
+                                        >
+                                            Stop Service
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-gray-400 italic mb-4">No active extended care subscription.</p>
+                            )}
+
+                            {/* Stop Service Form */}
+                            {showStopEC && activeEcSubscription && (
+                                <div className="p-4 bg-red-50 rounded-lg space-y-3 mb-4">
+                                    <p className="text-sm font-medium text-gray-700">Set end date for this subscription:</p>
+                                    <Input
+                                        type="date"
+                                        value={stopDate}
+                                        onChange={e => setStopDate(e.target.value)}
+                                        className="text-sm w-full"
+                                    />
+                                    <div className="flex gap-2">
+                                        <Button
+                                            onClick={handleStopEC}
+                                            disabled={saving}
+                                            className="flex-1 bg-red-600 hover:bg-red-700 text-white text-sm font-medium"
+                                        >
+                                            Confirm Stop
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="flex-1 text-sm"
+                                            onClick={() => setShowStopEC(false)}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Start Service Form */}
+                            {showStartEC && (
+                                <div className="p-4 bg-orange-50 rounded-lg space-y-4 mb-4">
+                                    {/* Start Date */}
+                                    <div>
+                                        <Label className="block text-xs font-medium text-gray-600 mb-1">Start Date</Label>
+                                        <Input
+                                            type="date"
+                                            value={newEC.start_date}
+                                            onChange={e => setNewEC({ ...newEC, start_date: e.target.value })}
+                                            className="text-sm w-full max-w-xs"
+                                        />
+                                    </div>
+
+                                    {/* Before Care Toggle */}
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewEC({ ...newEC, before_care: !newEC.before_care })}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${newEC.before_care ? 'bg-orange-600' : 'bg-gray-300'
+                                                }`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${newEC.before_care ? 'translate-x-6' : 'translate-x-1'
+                                                }`} />
+                                        </button>
+                                        <span className="text-sm font-medium text-gray-700">Before Care (Drop-off after 7:00 AM)</span>
+                                        {newEC.before_care && (
+                                            <Input
+                                                type="time"
+                                                value={newEC.drop_off_time}
+                                                onChange={e => setNewEC({ ...newEC, drop_off_time: e.target.value })}
+                                                min="07:00"
+                                                className="text-sm"
+                                            />
+                                        )}
+                                    </div>
+
+                                    {/* After Care Toggle */}
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewEC({ ...newEC, after_care: !newEC.after_care })}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${newEC.after_care ? 'bg-orange-600' : 'bg-gray-300'
+                                                }`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${newEC.after_care ? 'translate-x-6' : 'translate-x-1'
+                                                }`} />
+                                        </button>
+                                        <span className="text-sm font-medium text-gray-700">After Care (Pick-up before 6:00 PM)</span>
+                                        {newEC.after_care && (
+                                            <Input
+                                                type="time"
+                                                value={newEC.pickup_time}
+                                                onChange={e => setNewEC({ ...newEC, pickup_time: e.target.value })}
+                                                max="18:00"
+                                                className="text-sm"
+                                            />
+                                        )}
+                                    </div>
+
+                                    {/* Days of Week */}
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-600 mb-2">Days of Week</label>
+                                        <div className="flex gap-2">
+                                            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(day => (
+                                                <Button
+                                                    key={day}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const days = newEC.days_of_week.includes(day)
+                                                            ? newEC.days_of_week.filter(d => d !== day)
+                                                            : [...newEC.days_of_week, day];
+                                                        setNewEC({ ...newEC, days_of_week: days });
+                                                    }}
+                                                    className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${newEC.days_of_week.includes(day)
+                                                        ? 'bg-orange-600 text-white'
+                                                        : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    {day}
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="flex gap-2 pt-2">
+                                        <Button
+                                            onClick={handleStartEC}
+                                            disabled={saving}
+                                            className="flex-1 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium"
+                                        >
+                                            Start Extended Care
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="flex-1 text-sm"
+                                            onClick={() => setShowStartEC(false)}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Subscription History */}
+                            {ecSubscriptions.filter(s => s.end_date).length > 0 && (
+                                <div className="mt-4 pt-4 border-t border-gray-100">
+                                    <h3 className="text-sm font-medium text-gray-500 mb-2">Past Subscriptions</h3>
+                                    <div className="space-y-2">
+                                        {ecSubscriptions.filter(s => s.end_date).map(sub => (
+                                            <div key={sub.id} className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm">
+                                                <span className="text-gray-700">{sub.start_date} → {sub.end_date}</span>
+                                                <span className="text-gray-500 text-xs">{sub.days_of_week?.join(', ')}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Electives */}
+                    <Card>
+                        <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0">
+                            <CardTitle className="flex items-center gap-2 text-base font-bold">
+                                <BookOpen size={18} className="text-violet-600" /> Elective Classes
+                            </CardTitle>
+                            <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setShowAddElective(true)}
+                                className="text-violet-600 hover:bg-violet-50"
+                            >
+                                <Plus size={18} />
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            {electiveEnrollments.length === 0 ? (
+                                <p className="text-sm text-gray-400 italic">No elective enrollments.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {electiveEnrollments.map(ee => (
+                                        <div key={ee.id} className={`flex items-center justify-between p-3 rounded-lg ${ee.status === 'ACTIVE' ? 'bg-violet-50' : 'bg-gray-50'}`}>
+                                            <div>
+                                                <p className="font-medium text-gray-900">{ee.offering?.subject?.name || 'Unknown'}</p>
+                                                <p className="text-xs text-gray-500">
+                                                    {ee.offering?.schedule_day} @ {ee.offering?.schedule_start_time} • Started: {ee.start_date}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-xs px-2 py-1 rounded font-medium ${ee.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
+                                                    {ee.status}
+                                                </span>
+                                                {ee.status === 'ACTIVE' && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => handleRemoveElective(ee.id)}
+                                                        className="text-red-500 hover:text-red-700"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {showAddElective && (
+                                <div className="mt-4 p-4 bg-violet-50 rounded-lg space-y-3">
+                                    <ShadcnSelect
+                                        value={newElective.offering_id}
+                                        onValueChange={value => setNewElective({ ...newElective, offering_id: value })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select Elective Class" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {electiveOfferings.map(o => (
+                                                <SelectItem key={o.id} value={o.id}>
+                                                    {o.subject?.name} - {o.schedule_day} @ {o.schedule_start_time}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </ShadcnSelect>
+                                    <Input
+                                        type="date"
+                                        value={newElective.start_date}
+                                        onChange={e => setNewElective({ ...newElective, start_date: e.target.value })}
+                                        className="text-sm"
+                                    />
+                                    <div className="flex gap-2">
+                                        <Button
+                                            onClick={handleAddElective}
+                                            disabled={saving}
+                                            className="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium"
+                                        >
+                                            Enroll in Elective
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="flex-1 text-sm"
+                                            onClick={() => setShowAddElective(false)}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Vacations */}
+                    <Card>
+                        <CardHeader className="pb-4 flex flex-row items-center justify-between space-y-0">
+                            <CardTitle className="flex items-center gap-2 text-base font-bold">
+                                <Calendar size={18} className="text-blue-600" /> Vacation Log
+                            </CardTitle>
+                            <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setShowAddVacation(true)}
+                                className="text-blue-600 hover:bg-blue-50"
+                            >
+                                <Plus size={18} />
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            {vacations.length === 0 ? (
+                                <p className="text-sm text-gray-400 italic">No vacations scheduled.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {vacations.map(v => (
+                                        <div key={v.id} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                                            <div>
+                                                <p className="font-medium text-gray-900">
+                                                    {v.start_date} to {v.end_date}
+                                                </p>
+                                                {v.reason && <p className="text-xs text-gray-500">{v.reason}</p>}
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => handleRemoveVacation(v.id)}
+                                                className="text-red-500 hover:text-red-700"
+                                            >
+                                                <Trash2 size={16} />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {showAddVacation && (
+                                <div className="mt-4 p-4 bg-blue-50 rounded-lg space-y-3">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <Input
+                                            type="date"
+                                            placeholder="Start Date"
+                                            value={newVacation.start_date}
+                                            onChange={e => setNewVacation({ ...newVacation, start_date: e.target.value })}
+                                            className="text-sm"
+                                        />
+                                        <Input
+                                            type="date"
+                                            placeholder="End Date"
+                                            value={newVacation.end_date}
+                                            onChange={e => setNewVacation({ ...newVacation, end_date: e.target.value })}
+                                            className="text-sm"
+                                        />
+                                    </div>
+                                    <Input
+                                        placeholder="Reason (optional)"
+                                        value={newVacation.reason}
+                                        onChange={e => setNewVacation({ ...newVacation, reason: e.target.value })}
+                                        className="text-sm"
+                                    />
+                                    <div className="flex gap-2">
+                                        <Button
+                                            onClick={handleAddVacation}
+                                            disabled={saving}
+                                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium"
+                                        >
+                                            Add Vacation
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="flex-1 text-sm"
+                                            onClick={() => setShowAddVacation(false)}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                </div>{/* END RIGHT COLUMN */}
+
+            </div>{/* END two-column flex layout */}
         </div>
     );
 }
+

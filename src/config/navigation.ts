@@ -35,7 +35,7 @@ export interface NavItem {
 
 /**
  * The main configuration for the sidebar navigation.
- * 
+ *
  * Defines the links, icons, and access control for each menu item.
  */
 export const navItems: NavItem[] = [
@@ -58,29 +58,11 @@ export const navItems: NavItem[] = [
         roles: ['ADMIN', 'OFFICE']
     },
     {
-        title: 'Timesheet',
-        href: '/admin/staff-attendance',
-        icon: Clock,
-        roles: ['ADMIN', 'OFFICE']
-    },
-    {
-        title: 'Classrooms',
-        href: '/admin/classrooms',
-        icon: GraduationCap,
-        roles: ['ADMIN', 'OFFICE']
-    },
-    {
         title: 'Electives',
         href: '/admin/electives',
         icon: BookOpen,
         roles: ['ADMIN', 'TEACHER', 'OFFICE'],
         organizationTypes: ['SCHOOL'] // Only show for schools, not daycare
-    },
-    {
-        title: 'Enrollments',
-        href: '/admin/enrollments',
-        icon: ClipboardList,
-        roles: ['ADMIN', 'OFFICE']
     },
     {
         title: 'Extended Care',
@@ -89,39 +71,21 @@ export const navItems: NavItem[] = [
         roles: ['ADMIN', 'OFFICE']
     },
     {
-        title: 'Finance',
-        href: '/admin/finance',
-        icon: CreditCard,
-        roles: ['ADMIN'] // OFFICE does NOT have access to Finance
-    },
-    {
-        title: 'Attendance',
-        href: '/admin/attendance',
-        icon: ClipboardCheck,
-        roles: ['ADMIN', 'TEACHER', 'OFFICE']
-    },
-    {
-        title: 'Timetable',
-        href: '/admin/timetable',
-        icon: CalendarClock,
-        roles: ['ADMIN', 'TEACHER', 'OFFICE']
-    },
-    {
-        title: 'Vacations',
-        href: '/admin/vacations',
-        icon: Calendar,
-        roles: ['ADMIN', 'TEACHER', 'OFFICE']
-    },
-    {
-        title: 'Holidays',
+        title: 'School Calendar',
         href: '/admin/holidays',
         icon: Calendar,
         roles: ['ADMIN', 'OFFICE']
     },
     {
-        title: 'Reports',
-        href: '/admin/reports',
-        icon: TrendingUp,
+        title: 'Fees & Payments',
+        href: '/admin/finance',
+        icon: CreditCard,
+        roles: ['ADMIN'] // OFFICE does NOT have access to Finance
+    },
+    {
+        title: 'Timesheet',
+        href: '/admin/staff-attendance',
+        icon: Clock,
         roles: ['ADMIN', 'OFFICE']
     },
     {

@@ -8,8 +8,8 @@ import InactivityLogoutProvider from '@/components/InactivityLogoutProvider';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-    title: 'VedicRoots Attendance',
-    description: 'Attendance system for VedicRoots',
+    title: 'Vedic Roots Management System',
+    description: 'Management system for VedicRoots',
     manifest: '/manifest.json',
 };
 

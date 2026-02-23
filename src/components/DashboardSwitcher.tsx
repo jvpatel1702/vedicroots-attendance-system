@@ -27,8 +27,8 @@ const DASHBOARD_OPTIONS: DashboardOption[] = [
 
 /**
  * Component to switch between different dashboards based on user roles.
- * 
- * It displays a dropdown menu allowing users with multiple roles to navigate 
+ *
+ * It displays a dropdown menu allowing users with multiple roles to navigate
  * between their available dashboards (e.g., Admin, Teacher, Office).
  */
 export default function DashboardSwitcher() {
@@ -94,13 +94,13 @@ export default function DashboardSwitcher() {
         <div className="relative" ref={dropdownRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap min-w-0"
             >
                 {currentDashboard && (
-                    <span className={currentDashboard.color}>{currentDashboard.icon}</span>
+                    <span className={`flex-shrink-0 ${currentDashboard.color}`}>{currentDashboard.icon}</span>
                 )}
-                <span>{currentDashboard?.label || 'Switch Dashboard'}</span>
-                <ChevronDown size={16} className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                <span className="truncate">{currentDashboard?.label || 'Switch Dashboard'}</span>
+                <ChevronDown size={16} className={`flex-shrink-0 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isOpen && (

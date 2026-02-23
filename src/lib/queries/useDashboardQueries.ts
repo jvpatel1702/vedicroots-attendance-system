@@ -1,8 +1,16 @@
 /**
  * useDashboardQueries.ts
  * ----------------------
- * Shared TanStack Query hook for the admin dashboard stats.
- * Combines: total students, total staff, today's attendance, admissions, holiday.
+ * TanStack Query hook for the admin dashboard stats.
+ * Fetches:
+ *   1. Active enrollment count
+ *   2. Today's student attendance breakdown (present / absent / late)
+ *   3. Total staff + today's present staff
+ *   4. Recent admissions (this month / next month)
+ *   5. Today's holiday
+ *   6. Location-wise strength (active students + present staff per location)
+ *   7. Recent activity (new enrollments / departures in last 7 days)
+ *   8. Upcoming holidays (next 30 days)
  */
 import { useQuery } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabaseClient';
@@ -16,16 +24,18 @@ export function useDashboardStats(orgId: string | undefined) {
         staleTime: 1000 * 60 * 5,
         queryFn: async () => {
             const today = new Date().toISOString().split('T')[0];
-            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-            // 1. Total Active Students
+            // ── 1. Active Enrollment Count ────────────────────────────────────
             const { count: enrollmentCount } = await supabase
                 .from('enrollments')
                 .select('id, classrooms!inner(locations!inner(organization_id))', { count: 'exact', head: true })
                 .eq('status', 'ACTIVE')
                 .eq('classrooms.locations.organization_id', orgId!);
 
-            // 2. Today's Student Attendance
+            // ── 2. Today's Student Attendance ─────────────────────────────────
             const { data: attendance } = await supabase
                 .from('attendance')
                 .select(`
@@ -53,13 +63,13 @@ export function useDashboardStats(orgId: string | undefined) {
                 name: a.students ? `${a.students.first_name} ${a.students.last_name}` : 'Unknown',
             })) || [];
 
-            // 3. Total Staff
+            // ── 3. Total Staff ────────────────────────────────────────────────
             const { count: staffCount } = await supabase
                 .from('staff')
                 .select('id, persons!inner(organization_id)', { count: 'exact', head: true })
                 .eq('persons.organization_id', orgId!);
 
-            // 4. Present Staff
+            // ── 4. Present Staff ──────────────────────────────────────────────
             const { data: staffAttendance } = await supabase
                 .from('staff_attendance')
                 .select(`
@@ -89,7 +99,7 @@ export function useDashboardStats(orgId: string | undefined) {
                 }
             });
 
-            // 5. Admissions (this month + next month)
+            // ── 5. Admissions (this month + next month) ───────────────────────
             const { data: enrollmentData } = await supabase
                 .from('enrollments')
                 .select(`
@@ -117,7 +127,7 @@ export function useDashboardStats(orgId: string | undefined) {
                 }
             });
 
-            // 6. Today's Holiday
+            // ── 6. Today's Holiday ────────────────────────────────────────────
             const { data: holidayData } = await supabase
                 .from('school_holidays')
                 .select('*')
@@ -125,6 +135,109 @@ export function useDashboardStats(orgId: string | undefined) {
                 .gte('end_date', today)
                 .eq('organization_id', orgId!)
                 .limit(1);
+
+            // ── 7. Location-wise Strength ─────────────────────────────────────
+            // Fetches all locations for this org, then counts active students
+            // per location via classrooms → enrollments.
+            const { data: locationsData } = await supabase
+                .from('locations')
+                .select(`
+                    id,
+                    name,
+                    classrooms (
+                        id,
+                        name,
+                        enrollments (
+                            id, status
+                        )
+                    )
+                `)
+                .eq('organization_id', orgId!);
+
+            const locationStrength = (locationsData ?? []).map((loc: any) => {
+                let activeStudents = 0;
+                (loc.classrooms ?? []).forEach((cls: any) => {
+                    activeStudents += (cls.enrollments ?? []).filter((e: any) => e.status === 'ACTIVE').length;
+                });
+                return {
+                    id: loc.id,
+                    name: loc.name,
+                    activeStudents,
+                    // Present staff per location is complex (staff aren't assigned to locations directly).
+                    // We include total org-wide present staff as a proxy and will evolve this later.
+                    presentStaffNote: 'org-wide',
+                };
+            });
+
+            // ── 8. Recent Activity (last 7 days) ──────────────────────────────
+            // New joins: enrollments created in the last 7 days
+            const { data: recentJoins } = await supabase
+                .from('enrollments')
+                .select(`
+                    id, start_date, created_at, status,
+                    students (
+                        person:persons (first_name, last_name)
+                    ),
+                    classrooms!inner(locations!inner(organization_id))
+                `)
+                .eq('classrooms.locations.organization_id', orgId!)
+                .gte('created_at', sevenDaysAgo)
+                .order('created_at', { ascending: false })
+                .limit(10);
+
+            // Recent departures: enrollments whose end_date is in the last 7 days
+            const { data: recentDepartures } = await supabase
+                .from('enrollments')
+                .select(`
+                    id, end_date,
+                    students (
+                        person:persons (first_name, last_name)
+                    ),
+                    classrooms!inner(locations!inner(organization_id))
+                `)
+                .eq('classrooms.locations.organization_id', orgId!)
+                .gte('end_date', sevenDaysAgo)
+                .lte('end_date', today)
+                .order('end_date', { ascending: false })
+                .limit(10);
+
+            const recentActivity: any[] = [];
+
+            (recentJoins ?? []).forEach((e: any) => {
+                const student = e.students?.person;
+                if (student) {
+                    recentActivity.push({
+                        id: `join-${e.id}`,
+                        name: `${student.first_name} ${student.last_name}`,
+                        type: 'JOIN',
+                        date: e.start_date ?? e.created_at?.split('T')[0],
+                    });
+                }
+            });
+
+            (recentDepartures ?? []).forEach((e: any) => {
+                const student = e.students?.person;
+                if (student) {
+                    recentActivity.push({
+                        id: `leave-${e.id}`,
+                        name: `${student.first_name} ${student.last_name}`,
+                        type: 'LEAVE',
+                        date: e.end_date,
+                    });
+                }
+            });
+
+            // Sort combined activity by date desc
+            recentActivity.sort((a, b) => (a.date < b.date ? 1 : -1));
+
+            // ── 9. Upcoming Holidays (next 30 days) ───────────────────────────
+            const { data: upcomingHolidays } = await supabase
+                .from('school_holidays')
+                .select('id, name, start_date, end_date, description')
+                .eq('organization_id', orgId!)
+                .gte('start_date', today)
+                .lte('start_date', thirtyDaysLater)
+                .order('start_date', { ascending: true });
 
             return {
                 totalStudents: enrollmentCount || 0,
@@ -136,6 +249,9 @@ export function useDashboardStats(orgId: string | undefined) {
                 presentEmployees: Array.from(uniqueEmployees.values()),
                 admissions: admissionList,
                 todayHoliday: holidayData && holidayData.length > 0 ? holidayData[0] : null,
+                locationStrength,
+                recentActivity,
+                upcomingHolidays: upcomingHolidays ?? [],
             };
         },
     });

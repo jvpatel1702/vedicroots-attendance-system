@@ -1,16 +1,24 @@
 'use client';
 
 import { LogOut, Building2, ChevronDown } from 'lucide-react';
-import { createClient } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+
+import { createClient } from '@/lib/supabaseClient';
 import { OrganizationProvider, useOrganization } from '@/context/OrganizationContext';
 import { navItems } from '@/config/navigation';
 import Sidebar from '@/components/Sidebar';
+import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 /**
  * Inner layout content for the Admin section.
- * 
+ *
  * Handles:
  * - User role verification (via Auth or Dev Cookie).
  * - Navigation filtering based on role.
@@ -23,7 +31,6 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     const { selectedOrganization, organizations, setSelectedOrganization, isLoading: isOrgLoading } = useOrganization();
 
     const [userRole, setUserRole] = useState<string | null>(null);
-    const [isOrgDropdownOpen, setIsOrgDropdownOpen] = useState(false);
 
     useEffect(() => {
         async function getUserRole() {
@@ -69,76 +76,70 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     const handleOrgChange = (org: typeof selectedOrganization) => {
         if (org) {
             setSelectedOrganization(org);
-            setIsOrgDropdownOpen(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex">
-            {/* Sidebar - Fixed */}
-            <div className="hidden md:flex flex-col fixed left-0 top-0 h-screen w-64">
+        <div className="min-h-screen bg-gray-50 md:grid md:grid-cols-[16rem_1fr]">
+            {/* Sidebar - in flow so main never overlaps; sticky so it stays visible on scroll; 16rem fits "Admin Panel" on one line */}
+            <div className="hidden md:flex flex-col sticky top-0 h-screen w-[16rem] flex-shrink-0">
                 <Sidebar
                     items={filteredNavItems}
                     organizationType={selectedOrganization?.type}
                 />
 
                 {/* Logout Button */}
-                <div className="w-64 bg-white border-r border-gray-200 p-4 border-t">
-                    <button
+                <div className="w-full bg-white border-r border-gray-200 p-4 border-t mt-auto">
+                    <Button
+                        variant="destructive"
                         onClick={handleLogout}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-red-600 hover:bg-red-50 rounded-md transition-colors text-left group"
+                        className="w-full justify-start gap-3"
                     >
-                        <LogOut size={18} className="text-red-500 group-hover:text-red-600" />
+                        <LogOut size={18} />
                         <span className="text-sm font-medium">Sign Out</span>
-                    </button>
+                    </Button>
                 </div>
             </div>
 
-            {/* Main Content - Scrollable */}
-            <main className="flex-1 md:ml-64 overflow-y-auto h-screen flex flex-col">
-                {/* Sticky Organization Header */}
-                <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-8 py-3 flex items-center justify-between shadow-sm">
+            {/* Main Content - only column on mobile; second column on md+ so never under sidebar */}
+            <main className="min-w-0 min-h-screen overflow-y-auto flex flex-col">
+                {/* Sticky Organization Header - stays within main column */}
+                <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 sm:px-6 md:px-8 py-3 flex items-center justify-between shadow-sm">
                     <div className="flex items-center gap-3">
                         <Building2 size={20} className="text-brand-olive" />
                         <span className="text-sm text-gray-500">Organization:</span>
 
-                        {/* Dropdown */}
-                        <div className="relative">
-                            <button
-                                onClick={() => setIsOrgDropdownOpen(!isOrgDropdownOpen)}
-                                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
-                            >
-                                <span className="font-semibold text-gray-900">
-                                    {isOrgLoading ? 'Loading...' : selectedOrganization?.name || 'Select'}
-                                </span>
-                                <ChevronDown size={16} className={`text-gray-500 transition-transform ${isOrgDropdownOpen ? 'rotate-180' : ''}`} />
-                            </button>
-
-                            {isOrgDropdownOpen && (
-                                <>
-                                    {/* Backdrop */}
-                                    <div
-                                        className="fixed inset-0 z-10"
-                                        onClick={() => setIsOrgDropdownOpen(false)}
-                                    />
-
-                                    {/* Dropdown Menu */}
-                                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[200px]">
-                                        {organizations.map(org => (
-                                            <button
-                                                key={org.id}
-                                                onClick={() => handleOrgChange(org)}
-                                                className={`w-full text-left px-4 py-2.5 hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg flex items-center justify-between ${selectedOrganization?.id === org.id ? 'bg-brand-olive/10 text-brand-olive' : ''
-                                                    }`}
-                                            >
-                                                <span className="font-medium">{org.name}</span>
-                                                <span className="text-xs text-gray-400 uppercase">{org.type}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </>
-                            )}
-                        </div>
+                        {/* Dropdown — now using shadcn dropdown-menu */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 border-gray-200"
+                                >
+                                    <span className="font-semibold text-gray-900">
+                                        {isOrgLoading ? 'Loading...' : selectedOrganization?.name || 'Select'}
+                                    </span>
+                                    <ChevronDown size={16} className="text-gray-500" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="min-w-[220px]">
+                                {organizations.map((org) => (
+                                    <DropdownMenuItem
+                                        key={org.id}
+                                        onClick={() => handleOrgChange(org)}
+                                        className={
+                                            selectedOrganization?.id === org.id
+                                                ? 'bg-brand-olive/10 text-brand-olive flex items-center justify-between'
+                                                : 'flex items-center justify-between'
+                                        }
+                                    >
+                                        <span className="font-medium">{org.name}</span>
+                                        <span className="text-xs text-gray-400 uppercase">{org.type}</span>
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
 
                     {selectedOrganization && (
@@ -149,7 +150,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                 </div>
 
                 {/* Page Content */}
-                <div className="flex-1 p-8">
+                <div className="flex-1 px-4 sm:px-6 md:px-8 py-6 md:py-8">
                     {children}
                 </div>
             </main>
@@ -159,7 +160,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
 /**
  * The main layout for the Admin Dashboard.
- * 
+ *
  * Wraps the content with the `OrganizationProvider` to ensure organization context
  * is available throughout the admin pages.
  */
