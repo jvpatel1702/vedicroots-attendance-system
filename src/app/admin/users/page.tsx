@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Mail, Shield, Edit2, UserPlus, X, Trash2, Key } from 'lucide-react';
+import { Users, Mail, Shield, Edit2, UserPlus, Trash2, Key } from 'lucide-react';
 
 import { createClient } from '@/lib/supabaseClient';
 import { createUser, updateUser, deleteUser } from '@/lib/actions/users';
@@ -25,13 +25,17 @@ import {
     TableRow,
 } from '@/components/ui/table';
 
+/**
+ * A user profile joined with their roles from the `user_roles` table.
+ * `profiles` only stores: id, name, email.
+ * Role data exclusively lives in `user_roles`.
+ */
 interface Profile {
     id: string;
     name: string | null;
     email: string | null;
-    role: string;
-    roles: string[] | null;
-    created_at?: string;
+    /** Roles derived from the `user_roles` junction table */
+    roles: string[];
 }
 
 const AVAILABLE_ROLES = ['ADMIN', 'TEACHER', 'OFFICE', 'PARENT'];
@@ -55,15 +59,50 @@ export default function UsersPage() {
 
     const [processing, setProcessing] = useState(false);
 
+    /**
+     * Fetches all profiles and joins each user's roles from `user_roles`.
+     * `profiles` table: id, name, email (no role/roles columns).
+     */
     const fetchProfiles = useCallback(async () => {
         setLoading(true);
-        const { data, error } = await supabase
+
+        // 1. Fetch all profiles
+        const { data: profileData, error: profileError } = await supabase
             .from('profiles')
-            .select('*')
+            .select('id, name, email')
             .order('name', { ascending: true });
 
-        if (error) console.error('Error fetching profiles:', error);
-        else setProfiles(data || []);
+        if (profileError) {
+            console.error('Error fetching profiles:', profileError);
+            setLoading(false);
+            return;
+        }
+
+        // 2. Fetch all user_roles in one query
+        const { data: rolesData, error: rolesError } = await supabase
+            .from('user_roles')
+            .select('user_id, role');
+
+        if (rolesError) {
+            console.error('Error fetching user_roles:', rolesError);
+        }
+
+        // 3. Build a map of user_id → roles[]
+        const rolesMap = new Map<string, string[]>();
+        (rolesData ?? []).forEach((r: any) => {
+            const existing = rolesMap.get(r.user_id) ?? [];
+            rolesMap.set(r.user_id, [...existing, r.role]);
+        });
+
+        // 4. Merge into profile objects
+        const merged: Profile[] = (profileData ?? []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            email: p.email,
+            roles: rolesMap.get(p.id) ?? [],
+        }));
+
+        setProfiles(merged);
         setLoading(false);
     }, [supabase]);
 
@@ -96,7 +135,7 @@ export default function UsersPage() {
             await updateUser(editingProfile.id, {
                 name: editData.name,
                 roles: editData.roles,
-                password: editData.password || undefined
+                password: editData.password || undefined,
             });
             alert('User updated successfully!');
             setEditingProfile(null);
@@ -131,14 +170,10 @@ export default function UsersPage() {
             case 'TEACHER': return 'bg-blue-100 text-blue-700 border-blue-200';
             case 'OFFICE': return 'bg-green-100 text-green-700 border-green-200';
             case 'PARENT': return 'bg-purple-100 text-purple-700 border-purple-200';
+            case 'SUPER_ADMIN': return 'bg-orange-100 text-orange-700 border-orange-200';
+            case 'ORG_ADMIN': return 'bg-amber-100 text-amber-700 border-amber-200';
             default: return 'bg-gray-100 text-gray-700 border-gray-200';
         }
-    };
-
-    // Helper to get display roles, falling back to legacy single role
-    const getDisplayRoles = (p: Profile) => {
-        if (p.roles && p.roles.length > 0) return p.roles;
-        return [p.role];
     };
 
     return (
@@ -161,7 +196,7 @@ export default function UsersPage() {
                 </Button>
             </div>
 
-            {/* Stats */}
+            {/* Stats — count by role from user_roles */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {AVAILABLE_ROLES.map(role => (
                     <Card key={role}>
@@ -171,7 +206,7 @@ export default function UsersPage() {
                             </div>
                             <div>
                                 <p className="text-2xl font-bold text-gray-900">
-                                    {profiles.filter(p => getDisplayRoles(p).includes(role)).length}
+                                    {profiles.filter(p => p.roles.includes(role)).length}
                                 </p>
                                 <p className="text-xs text-gray-500">{role}</p>
                             </div>
@@ -203,12 +238,23 @@ export default function UsersPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredProfiles.map(p => (
+                            {loading ? (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="px-6 py-8 text-center text-muted-foreground italic">
+                                        Loading users…
+                                    </TableCell>
+                                </TableRow>
+                            ) : filteredProfiles.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="px-6 py-8 text-center text-muted-foreground italic">
+                                        No users found.
+                                    </TableCell>
+                                </TableRow>
+                            ) : filteredProfiles.map(p => (
                                 <TableRow key={p.id} className="hover:bg-gray-50 transition-colors">
                                     <TableCell className="px-6 py-4">
                                         <div className="flex flex-col">
                                             <span className="font-semibold text-gray-900">{p.name || 'No Name'}</span>
-                                            {/* Hidden password indicator for visual cue */}
                                             <span className="text-[10px] text-gray-400 flex items-center gap-1">
                                                 <Key size={10} /> ••••••••
                                             </span>
@@ -222,7 +268,7 @@ export default function UsersPage() {
                                     </TableCell>
                                     <TableCell className="px-6 py-4">
                                         <div className="flex flex-wrap gap-1">
-                                            {getDisplayRoles(p).map(role => (
+                                            {p.roles.length > 0 ? p.roles.map(role => (
                                                 <Badge
                                                     key={role}
                                                     variant="outline"
@@ -230,7 +276,9 @@ export default function UsersPage() {
                                                 >
                                                     {role}
                                                 </Badge>
-                                            ))}
+                                            )) : (
+                                                <span className="text-xs text-muted-foreground italic">No roles</span>
+                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell className="px-6 py-4 text-right">
@@ -242,8 +290,8 @@ export default function UsersPage() {
                                                     setEditingProfile(p);
                                                     setEditData({
                                                         name: p.name || '',
-                                                        roles: getDisplayRoles(p),
-                                                        password: ''
+                                                        roles: p.roles,
+                                                        password: '',
                                                     });
                                                 }}
                                                 title="Edit User"

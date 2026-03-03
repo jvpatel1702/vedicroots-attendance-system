@@ -52,23 +52,32 @@ import { BookOpen } from 'lucide-react';
 
 // ── Type Definitions ─────────────────────────────────────────────────────────
 
+/**
+ * Guardian contact as returned by useStudents:
+ * `guardians` table only has id + person_id;
+ * contact fields (email/phone) live on the nested `person` (from `persons` table).
+ */
 interface GuardianContact {
   is_primary?: boolean;
   guardians: {
-    email?: string | null;
-    phone?: string | null;
+    id: string;
+    person: {
+      first_name?: string | null;
+      last_name?: string | null;
+      email?: string | null;
+      phone?: string | null;
+    } | null;
   } | null;
 }
 
 interface Student {
   id: string;
   student_number: string;
-  gender?: string | null;
-  dob?: string | null; // from students table (legacy column)
   person: {
     first_name: string;
     last_name: string;
-    dob?: string | null; // from persons table (new column)
+    dob?: string | null;    // dob lives on persons, not students
+    gender?: string | null; // gender lives on persons, not students
     photo_url?: string | null;
   };
   medical?: {
@@ -135,6 +144,11 @@ function getPrimaryGuardian(
   return guardians.find(g => g.guardians)?.guardians ?? null;
 }
 
+/** Helper to extract email from a guardian contact (contact data on nested person) */
+function getGuardianEmail(g: GuardianContact['guardians']): string | null {
+  return g?.person?.email ?? null;
+}
+
 /**
  * Returns hover-only row classes based on student gender.
  * Rows are white at rest — the color only appears on hover,
@@ -177,7 +191,7 @@ export default function StudentsPage() {
 
   // ── TanStack Queries ──────────────────────────────────────────────────
   const { data: enrollments = [] } =
-    useEnrollments(selectedYear);
+    useEnrollments(selectedYear, selectedOrganization?.id);
 
   /** Academic years list for the filter dropdown */
   const { data: academicYears = [] } = useAcademicYears();
@@ -269,7 +283,8 @@ export default function StudentsPage() {
     const emails: string[] = [];
     sortedStudents.forEach(s => {
       const guardian = getPrimaryGuardian(s.student_guardians);
-      if (guardian?.email) emails.push(guardian.email.trim().toLowerCase());
+      const email = getGuardianEmail(guardian);
+      if (email) emails.push(email.trim().toLowerCase());
     });
 
     const unique = Array.from(new Set(emails));
@@ -333,7 +348,8 @@ export default function StudentsPage() {
         id: 'age',
         header: 'Age',
         cell: student => {
-          const age = getAge(student.dob ?? student.person.dob);
+          // dob is on person (from persons table), not on students
+          const age = getAge(student.person.dob);
           return age !== null ? age : <span className="text-gray-400">—</span>;
         },
       },
@@ -619,7 +635,7 @@ export default function StudentsPage() {
             onRowClick={student =>
               router.push(`/admin/students/${student.id}`)
             }
-            getRowClassName={s => getGenderRowClass(s.gender)}
+            getRowClassName={s => getGenderRowClass(s.person.gender)}
             sortState={{ key: 'grade', direction: gradeSort }}
             onSort={() =>
               setGradeSort(prev => (prev === 'asc' ? 'desc' : 'asc'))

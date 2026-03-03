@@ -42,20 +42,29 @@ export default function DashboardSwitcher() {
 
     useEffect(() => {
         async function fetchRoles() {
+            // Check dev cookie first
+            const devRole = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('dev_role='))
+                ?.split('=')[1];
+
+            if (devRole) {
+                setUserRoles([devRole]);
+                setLoading(false);
+                return;
+            }
+
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('role, roles')
-                    .eq('id', user.id)
-                    .single();
+                // profiles.role and profiles.roles do NOT exist.
+                // Roles are exclusively stored in the user_roles table (Phase 2 schema).
+                const { data: roleRows } = await supabase
+                    .from('user_roles')
+                    .select('role')
+                    .eq('user_id', user.id);
 
-                if (profile) {
-                    // Use roles array if available, otherwise fall back to single role
-                    const roles = profile.roles && profile.roles.length > 0
-                        ? profile.roles
-                        : [profile.role];
-                    setUserRoles(roles);
+                if (roleRows && roleRows.length > 0) {
+                    setUserRoles(roleRows.map((r: any) => r.role as string));
                 }
             }
             setLoading(false);

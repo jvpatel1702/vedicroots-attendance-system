@@ -34,7 +34,7 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         async function getUserRole() {
-            // 1. Check Dev Cookie first
+            // 1. Check Dev Cookie first (local dev override)
             const devRole = document.cookie
                 .split('; ')
                 .find(row => row.startsWith('dev_role='))
@@ -47,25 +47,33 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
 
             // 2. Check Supabase Auth
             const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                // Fetch profile
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('role')
-                    .eq('id', user.id)
-                    .single();
+            if (!user) return;
 
-                if (profile) {
-                    setUserRole(profile.role);
-                }
+            // 3. Fetch the user's highest-priority role from user_roles table.
+            //    profiles.role does NOT exist — roles are exclusively in user_roles.
+            //    Priority: ADMIN > ORG_ADMIN > SUPER_ADMIN > OFFICE > TEACHER > PARENT
+            const ROLE_PRIORITY = ['ADMIN', 'SUPER_ADMIN', 'ORG_ADMIN', 'OFFICE', 'TEACHER', 'PARENT'];
+
+            const { data: roleRows } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', user.id);
+
+            if (roleRows && roleRows.length > 0) {
+                const userRoles = roleRows.map((r: any) => r.role as string);
+                // Pick the highest-priority role for nav filtering
+                const bestRole = ROLE_PRIORITY.find(r => userRoles.includes(r));
+                setUserRole(bestRole ?? userRoles[0]);
             }
         }
         getUserRole();
     }, [supabase]);
 
-    const filteredNavItems = navItems.filter(item =>
-        userRole ? item.roles.includes(userRole) : false
-    );
+    // When userRole is null (still loading), show all items so sidebar is never blank.
+    // Once the role resolves, filter down to the appropriate items.
+    const filteredNavItems = userRole
+        ? navItems.filter(item => item.roles.includes(userRole))
+        : navItems; // show all while loading — Sidebar itself handles org-type filtering
 
     const handleLogout = async () => {
         document.cookie = "dev_role=; path=/; max-age=0";

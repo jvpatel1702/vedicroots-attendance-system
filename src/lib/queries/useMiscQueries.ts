@@ -26,7 +26,9 @@ export function useHolidays(orgId: string | undefined) {
     });
 }
 
-// ── Users ───────────────────────────────────────────────────────────────────
+// ── Users (staff with linked accounts) ─────────────────────────────────────
+// Reads from `staff` joined to `persons` for org scoping.
+// Role data comes from `user_roles` (not profiles).
 
 export function useUsers(orgId: string | undefined) {
     const supabase = createClient();
@@ -68,22 +70,26 @@ export function usePayPeriods(orgId: string | undefined) {
 }
 
 // ── Student Vacations (org-wide, for admin view) ────────────────────────────
+// Scoped to the selected organization via students → persons → organization_id.
 
 export function useVacations(orgId: string | undefined) {
     const supabase = createClient();
     return useQuery({
         queryKey: ['vacations', orgId],
+        // Only run when an org is selected to prevent cross-org data leaks
         enabled: !!orgId,
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('student_vacations')
                 .select(`
                     *,
-                    students (
+                    students!inner (
                         id,
-                        persons (first_name, last_name)
+                        persons!inner (first_name, last_name, organization_id)
                     )
                 `)
+                // Scope to current org via persons.organization_id
+                .eq('students.persons.organization_id', orgId!)
                 .order('start_date', { ascending: false });
             if (error) throw error;
             return data ?? [];

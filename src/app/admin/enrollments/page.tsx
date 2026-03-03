@@ -38,7 +38,7 @@ export default function EnrollmentsPage() {
 
     // ── TanStack Queries ────────────────────────────────────────────────────
     const { data: academicYears = [] } = useAcademicYears();
-    const { data: enrollments = [], isLoading } = useEnrollments(selectedYear);
+    const { data: enrollments = [], isLoading } = useEnrollments(selectedYear, selectedOrganization?.id);
     const { data: classrooms = [] } = useClassroomOptions(selectedOrganization?.id);
     const { data: grades = [] } = useGrades(selectedOrganization?.id);
 
@@ -52,7 +52,7 @@ export default function EnrollmentsPage() {
     }, [academicYears, selectedYear]);
 
     const invalidateEnrollments = () => {
-        queryClient.invalidateQueries({ queryKey: ['enrollments', selectedYear] });
+        queryClient.invalidateQueries({ queryKey: ['enrollments', selectedYear, selectedOrganization?.id] });
     };
 
     const handleEdit = (enrollment: Enrollment) => {

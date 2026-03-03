@@ -5,23 +5,24 @@ import { createClient } from './supabaseClient';
 import { User } from '@supabase/supabase-js';
 
 /**
- * Extends the Supabase User type with app-specific profile data.
+ * Extends the Supabase User type with app-specific role data.
+ * Roles come exclusively from the `user_roles` table (not `profiles`).
  */
 export interface AppUser extends Partial<User> {
     id: string;
     email?: string;
-    /** The role of the user, fetched from the `profiles` table (e.g., 'ADMIN', 'TEACHER', 'OFFICE') */
+    /** Primary (highest-priority) role for the user derived from user_roles */
     role?: string;
-    /** All roles assigned to the user, if multi-role is enabled */
+    /** All roles assigned to the user via the user_roles junction table */
     roles?: string[];
 }
 
 /**
  * Custom hook to fetch and provide the current authenticated user,
- * including their role from the `profiles` table.
+ * including their roles from the `user_roles` table.
  *
- * Role is ALWAYS fetched server-side from the database — never trusted from
- * client-side state, cookies, or localStorage.
+ * NOTE: `profiles.role` and `profiles.roles` do NOT exist in the DB schema.
+ * All role data lives exclusively in the `user_roles` junction table.
  *
  * @returns An object containing the user object and loading state.
  */
@@ -40,17 +41,22 @@ export function useUser() {
                 return;
             }
 
-            // Fetch the role from the profiles table — never trust client-side state
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('role, roles')
-                .eq('id', authUser.id)
-                .single();
+            // Fetch all roles for this user from user_roles (a user may have multiple)
+            const ROLE_PRIORITY = ['ADMIN', 'SUPER_ADMIN', 'ORG_ADMIN', 'OFFICE', 'TEACHER', 'PARENT'];
+
+            const { data: roleRows } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', authUser.id);
+
+            const roles = roleRows?.map((r: any) => r.role as string) ?? [];
+            // Pick the most privileged role as the primary role
+            const primaryRole = ROLE_PRIORITY.find(r => roles.includes(r)) ?? roles[0];
 
             setUser({
                 ...authUser,
-                role: profile?.role ?? undefined,
-                roles: profile?.roles ?? undefined,
+                role: primaryRole,
+                roles,
             });
 
             setLoading(false);

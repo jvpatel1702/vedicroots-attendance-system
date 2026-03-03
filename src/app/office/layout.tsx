@@ -18,23 +18,28 @@ function OfficeLayoutContent({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         async function getUserRole() {
             const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('role')
-                    .eq('id', user.id)
-                    .single();
+            if (!user) return;
 
-                if (profile) {
-                    setUserRole(profile.role);
+            // profiles.role does NOT exist — roles live in user_roles table.
+            const ROLE_PRIORITY = ['ADMIN', 'SUPER_ADMIN', 'ORG_ADMIN', 'OFFICE', 'TEACHER', 'PARENT'];
 
-                    // Redirect if not OFFICE role
-                    if (profile.role !== 'OFFICE') {
-                        if (profile.role === 'ADMIN') {
-                            router.push('/admin');
-                        } else if (profile.role === 'TEACHER') {
-                            router.push('/teacher');
-                        }
+            const { data: roleRows } = await supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', user.id);
+
+            if (roleRows && roleRows.length > 0) {
+                const userRoles = roleRows.map((r: any) => r.role as string);
+                const bestRole = ROLE_PRIORITY.find(r => userRoles.includes(r));
+                const resolvedRole = bestRole ?? userRoles[0];
+                setUserRole(resolvedRole);
+
+                // Redirect if the best role is not OFFICE
+                if (resolvedRole !== 'OFFICE') {
+                    if (userRoles.includes('ADMIN')) {
+                        router.push('/admin');
+                    } else if (userRoles.includes('TEACHER')) {
+                        router.push('/teacher');
                     }
                 }
             }
@@ -42,9 +47,10 @@ function OfficeLayoutContent({ children }: { children: React.ReactNode }) {
         getUserRole();
     }, [supabase, router]);
 
-    const filteredNavItems = navItems.filter(item =>
-        userRole ? item.roles.includes(userRole) : false
-    );
+    // Show all nav items while role is loading to prevent blank sidebar
+    const filteredNavItems = userRole
+        ? navItems.filter(item => item.roles.includes(userRole))
+        : navItems;
 
     const handleLogout = async () => {
         await supabase.auth.signOut();

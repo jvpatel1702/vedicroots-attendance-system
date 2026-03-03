@@ -2,6 +2,11 @@
  * useStudentQueries.ts
  * --------------------
  * Shared TanStack Query hooks for student data.
+ *
+ * Schema alignment notes (database_design.md):
+ *  - `students` table: id, profile_picture, student_number, person_id, created_at, updated_at
+ *    → NO gender / dob columns on students; they live on `persons`
+ *  - `guardians` table: id, person_id  (contact data is on `persons`, not `guardians`)
  */
 import { useQuery } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabaseClient';
@@ -42,12 +47,11 @@ export function useStudents(orgId: string | undefined, selectedYear: string) {
                     .select(`
                         id,
                         student_number,
-                        gender,
-                        dob,
                         person:persons!inner (
                             first_name,
                             last_name,
                             dob,
+                            gender,
                             photo_url,
                             organization_id
                         ),
@@ -61,8 +65,13 @@ export function useStudents(orgId: string | undefined, selectedYear: string) {
                         student_guardians (
                             is_primary,
                             guardians (
-                                email,
-                                phone
+                                id,
+                                person:persons (
+                                    first_name,
+                                    last_name,
+                                    email,
+                                    phone
+                                )
                             )
                         ),
                         enrollments (
@@ -98,12 +107,11 @@ export function useStudents(orgId: string | undefined, selectedYear: string) {
                 .select(`
                     id,
                     student_number,
-                    gender,
-                    dob,
                     person:persons!inner (
                         first_name,
                         last_name,
                         dob,
+                        gender,
                         photo_url
                     ),
                     medical:student_medical (
@@ -116,8 +124,13 @@ export function useStudents(orgId: string | undefined, selectedYear: string) {
                     student_guardians (
                         is_primary,
                         guardians (
-                            email,
-                            phone
+                            id,
+                            person:persons (
+                                first_name,
+                                last_name,
+                                email,
+                                phone
+                            )
                         )
                     ),
                     enrollments!inner (
@@ -153,7 +166,7 @@ export function useStudent(studentId: string | undefined) {
                 .select(`
                     id,
                     student_number,
-                    person:persons (id, first_name, last_name, dob, photo_url),
+                    person:persons (id, first_name, last_name, dob, gender, photo_url),
                     medical:student_medical (allergies, medical_conditions, medications, doctor_name, doctor_phone)
                 `)
                 .eq('id', studentId!)
@@ -165,6 +178,8 @@ export function useStudent(studentId: string | undefined) {
 }
 
 // ── Student Guardians ───────────────────────────────────────────────────────
+// NOTE: `guardians` table only has `id` and `person_id`.
+// Contact fields (first_name, last_name, email, phone) live on the `persons` table.
 
 export function useStudentGuardians(studentId: string | undefined) {
     const supabase = createClient();
@@ -180,21 +195,28 @@ export function useStudentGuardians(studentId: string | undefined) {
                     is_primary,
                     is_pickup_authorized,
                     is_emergency_contact,
-                    guardians (id, first_name, last_name, email, phone)
+                    guardians (
+                        id,
+                        person:persons (first_name, last_name, email, phone)
+                    )
                 `)
                 .eq('student_id', studentId!);
             if (error) throw error;
-            return (data ?? []).map((g: any) => ({
-                id: g.guardians.id,
-                first_name: g.guardians.first_name,
-                last_name: g.guardians.last_name,
-                email: g.guardians.email,
-                phone: g.guardians.phone,
-                relationship: g.relationship,
-                is_primary: g.is_primary,
-                is_pickup_authorized: g.is_pickup_authorized,
-                is_emergency_contact: g.is_emergency_contact,
-            }));
+            return (data ?? []).map((g: any) => {
+                // Contact data lives on guardians.person (from persons table)
+                const person = g.guardians?.person;
+                return {
+                    id: g.guardians?.id,
+                    first_name: person?.first_name ?? '',
+                    last_name: person?.last_name ?? '',
+                    email: person?.email ?? '',
+                    phone: person?.phone ?? '',
+                    relationship: g.relationship,
+                    is_primary: g.is_primary,
+                    is_pickup_authorized: g.is_pickup_authorized,
+                    is_emergency_contact: g.is_emergency_contact,
+                };
+            });
         },
     });
 }
