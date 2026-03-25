@@ -19,17 +19,21 @@ export default function LoginPage() {
         async function checkSession() {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user) {
-                const { data: profile } = await supabase
-                    .from('profiles')
+                // profiles.role does NOT exist — roles live in user_roles table
+                const { data: roleRows } = await supabase
+                    .from('user_roles')
                     .select('role')
-                    .eq('id', session.user.id)
-                    .single();
+                    .eq('user_id', session.user.id);
 
-                if (profile?.role === 'ADMIN') {
+                const ROLE_PRIORITY = ['ADMIN', 'SUPER_ADMIN', 'ORG_ADMIN', 'OFFICE', 'TEACHER', 'PARENT'];
+                const roles = roleRows?.map((r: any) => r.role as string) ?? [];
+                const role = ROLE_PRIORITY.find(r => roles.includes(r)) ?? roles[0];
+
+                if (role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'ORG_ADMIN') {
                     router.replace('/admin');
-                } else if (profile?.role === 'TEACHER') {
+                } else if (role === 'TEACHER') {
                     router.replace('/teacher');
-                } else if (profile?.role === 'OFFICE') {
+                } else if (role === 'OFFICE') {
                     router.replace('/office');
                 } else {
                     setChecking(false);
@@ -56,29 +60,32 @@ export default function LoginPage() {
                 throw error;
             }
 
-            // Fetch profile to redirect correctly
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
+            // Fetch role from user_roles (profiles.role does NOT exist in the schema)
+            const { data: roleRows, error: roleError } = await supabase
+                .from('user_roles')
                 .select('role')
-                .eq('id', data.user.id)
-                .single();
+                .eq('user_id', data.user.id);
 
-            if (profileError) {
-                console.error("Profile fetch error:", profileError);
+            if (roleError) {
+                console.error('Role fetch error:', roleError);
             }
 
-            if (profile?.role === 'ADMIN') {
+            const ROLE_PRIORITY = ['ADMIN', 'SUPER_ADMIN', 'ORG_ADMIN', 'OFFICE', 'TEACHER', 'PARENT'];
+            const roles = roleRows?.map((r: any) => r.role as string) ?? [];
+            const role = ROLE_PRIORITY.find(r => roles.includes(r)) ?? roles[0];
+
+            if (role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'ORG_ADMIN') {
                 router.push('/admin');
-            } else if (profile?.role === 'TEACHER') {
+            } else if (role === 'TEACHER') {
                 router.push('/teacher');
-            } else if (profile?.role === 'OFFICE') {
+            } else if (role === 'OFFICE') {
                 router.push('/office');
             } else {
-                // Fallback for unknown roles
-                router.push('/admin');
+                setError('Your account has no role assigned. Contact an administrator.');
+                setLoading(false);
             }
         } catch (err: any) {
-            setError(err.message || "An unexpected error occurred");
+            setError(err.message || 'An unexpected error occurred');
             setLoading(false);
         }
         // Note: We don't set loading false on success to prevent UI flash before navigation
@@ -99,10 +106,10 @@ export default function LoginPage() {
                 <div className="p-8 sm:p-10">
                     <div className="text-center mb-8">
                         <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-600">
-                            VedicRoots
+                            Vedic Roots
                         </h2>
                         <p className="mt-2 text-sm text-gray-500">
-                            Welcome back! Please access your account.
+                            Welcome back!
                         </p>
                     </div>
 

@@ -4,6 +4,7 @@ import './globals.css';
 import { Toaster } from 'sonner';
 import QueryProvider from '@/providers/QueryProvider';
 import InactivityLogoutProvider from '@/components/InactivityLogoutProvider';
+import ClockInPromptProvider from '@/components/ClockInPromptProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -38,6 +39,7 @@ export default function RootLayout({
             <body className={inter.className}>
                 <QueryProvider>
                     <InactivityLogoutProvider />
+                    <ClockInPromptProvider />
                     {children}
                 </QueryProvider>
                 <Toaster richColors position="top-center" />

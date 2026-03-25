@@ -191,3 +191,62 @@ export async function getPayPeriodAttendance(staffId: string, payPeriodId: strin
     }
     return { success: true, records: data };
 }
+
+/**
+ * Returns the clock-in state for the currently logged-in user.
+ *
+ * Used by the global ClockInPromptProvider to decide whether to show the prompt.
+ * Resolves the user → staff link via staff.user_id.
+ *
+ * Possible states:
+ *  - hasStaffRecord: false  → user is not staff, skip prompt
+ *  - isClockedIn: false     → staff, but hasn't clocked in yet today → show prompt
+ *  - isShiftDone: true      → already clocked in AND out → skip prompt
+ *  - isClockedIn: true, isShiftDone: false → currently working → skip prompt
+ */
+export async function getStaffClockInStatus(userId: string): Promise<{
+    hasStaffRecord: boolean;
+    staffId: string | null;
+    isClockedIn: boolean;
+    isShiftDone: boolean;
+    record: Record<string, unknown> | null;
+}> {
+    const supabase = await createClient();
+
+    // 1. Find the staff record linked to this auth user
+    const { data: staff, error: staffError } = await supabase
+        .from('staff')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .single();
+
+    if (staffError || !staff) {
+        return { hasStaffRecord: false, staffId: null, isClockedIn: false, isShiftDone: false, record: null };
+    }
+
+    // 2. Check today's attendance record
+    const today = new Date().toISOString().split('T')[0];
+    const { data: record, error: recordError } = await supabase
+        .from('staff_attendance')
+        .select('id, check_in, check_out, status')
+        .eq('staff_id', staff.id)
+        .eq('date', today)
+        .maybeSingle();
+
+    if (recordError) {
+        // Fail open — don't show the prompt if we can't determine status
+        return { hasStaffRecord: true, staffId: staff.id, isClockedIn: false, isShiftDone: false, record: null };
+    }
+
+    const isClockedIn = !!record?.check_in;
+    const isShiftDone = isClockedIn && !!record?.check_out;
+
+    return {
+        hasStaffRecord: true,
+        staffId: staff.id,
+        isClockedIn,
+        isShiftDone,
+        record: record ?? null,
+    };
+}
