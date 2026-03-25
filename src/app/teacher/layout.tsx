@@ -6,6 +6,7 @@ import { Home, ClipboardCheck, BookOpen, LogOut } from 'lucide-react';
 import { createClient } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import DashboardSwitcher from '@/components/DashboardSwitcher';
+import HeaderClockOutButton from '@/components/HeaderClockOutButton';
 
 export default function TeacherLayout({
     children,
@@ -40,6 +41,7 @@ export default function TeacherLayout({
                 <div className="flex items-center gap-4">
                     <h1 className="text-lg font-bold text-gray-800">Teacher Dashboard</h1>
                     <DashboardSwitcher />
+                    <HeaderClockOutButton />
                 </div>
                 <button onClick={handleLogout} className="text-gray-500 hover:text-red-600">
                     <LogOut size={20} />

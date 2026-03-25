@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { OrganizationProvider, useOrganization } from '@/context/OrganizationContext';
 import { navItems } from '@/config/navigation';
 import Sidebar from '@/components/Sidebar';
+import HeaderClockOutButton from '@/components/HeaderClockOutButton';
 
 function OfficeLayoutContent({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -79,8 +80,13 @@ function OfficeLayoutContent({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* Main Content - only content on mobile; second column on md+ so never under sidebar */}
-            <main className="min-w-0 min-h-screen overflow-y-auto p-4 md:p-8">
-                {children}
+            <main className="min-w-0 min-h-screen overflow-y-auto flex flex-col">
+                <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-sm border-b border-gray-100 px-4 py-3 flex justify-end min-h-[50px]">
+                    <HeaderClockOutButton />
+                </div>
+                <div className="p-4 md:p-8 flex-1">
+                    {children}
+                </div>
             </main>
         </div>
     );

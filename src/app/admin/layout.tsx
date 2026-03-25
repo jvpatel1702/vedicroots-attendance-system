@@ -15,6 +15,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import HeaderClockOutButton from '@/components/HeaderClockOutButton';
 
 /**
  * Inner layout content for the Admin section.
@@ -150,11 +151,14 @@ function AdminLayoutContent({ children }: { children: React.ReactNode }) {
                         </DropdownMenu>
                     </div>
 
-                    {selectedOrganization && (
-                        <span className="text-xs bg-brand-olive/10 text-brand-olive px-2 py-1 rounded uppercase font-semibold">
-                            {selectedOrganization.type}
-                        </span>
-                    )}
+                    <div className="flex items-center gap-3">
+                        <HeaderClockOutButton />
+                        {selectedOrganization && (
+                            <span className="text-xs bg-brand-olive/10 text-brand-olive px-2 py-1 rounded uppercase font-semibold">
+                                {selectedOrganization.type}
+                            </span>
+                        )}
+                    </div>
                 </div>
 
                 {/* Page Content */}

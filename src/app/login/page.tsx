@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { Loader2, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
+import { getStaffClockInStatus } from '@/lib/actions/staff-attendance';
 
 export default function LoginPage() {
     const supabase = createClient();
@@ -27,7 +28,19 @@ export default function LoginPage() {
 
                 const ROLE_PRIORITY = ['ADMIN', 'SUPER_ADMIN', 'ORG_ADMIN', 'OFFICE', 'TEACHER', 'PARENT'];
                 const roles = roleRows?.map((r: any) => r.role as string) ?? [];
+                if (roles.length === 0) {
+                    setChecking(false);
+                    return;
+                }
                 const role = ROLE_PRIORITY.find(r => roles.includes(r)) ?? roles[0];
+
+                // Check clock-in status before routing
+                const clockStatus = await getStaffClockInStatus(session.user.id);
+
+                if (clockStatus.hasStaffRecord && !clockStatus.isClockedIn) {
+                    router.replace('/clock-in');
+                    return;
+                }
 
                 if (role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'ORG_ADMIN') {
                     router.replace('/admin');
@@ -72,7 +85,22 @@ export default function LoginPage() {
 
             const ROLE_PRIORITY = ['ADMIN', 'SUPER_ADMIN', 'ORG_ADMIN', 'OFFICE', 'TEACHER', 'PARENT'];
             const roles = roleRows?.map((r: any) => r.role as string) ?? [];
+            
+            if (roles.length === 0) {
+                setError('Your account has no role assigned. Contact an administrator.');
+                setLoading(false);
+                return;
+            }
+            
             const role = ROLE_PRIORITY.find(r => roles.includes(r)) ?? roles[0];
+
+            // Check clock-in status before routing
+            const clockStatus = await getStaffClockInStatus(data.user.id);
+
+            if (clockStatus.hasStaffRecord && !clockStatus.isClockedIn) {
+                router.push('/clock-in');
+                return;
+            }
 
             if (role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'ORG_ADMIN') {
                 router.push('/admin');

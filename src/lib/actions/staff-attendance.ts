@@ -16,7 +16,7 @@ const determineStatus = (checkInTime: string, scheduledStartTime: string): strin
  * 
  * Checks for existing clock-ins, verifies active status, and links to the current pay period.
  */
-export async function clockIn(staffId: string, locationData?: { lat: number, lng: number }) {
+export async function clockIn(staffId: string, options?: { lat?: number, lng?: number, qrCode?: string }) {
     const supabase = await createClient();
 
     // 1. Verify staff exists and is active
@@ -70,15 +70,33 @@ export async function clockIn(staffId: string, locationData?: { lat: number, lng
     // If no pay period found, we might want to still allow clock in but warn or create one? 
     // For now, allow null pay_period_id if not found (or strict mode?)
 
+    // Validate QR code if provided
+    let isLocationVerified = !!(options?.lat && options?.lng);
+    
+    if (options?.qrCode && orgId) {
+        const { data: qrConfig } = await supabase
+            .from('school_qr_config')
+            .select('code_value')
+            .eq('organization_id', orgId)
+            .eq('active', true)
+            .single();
+            
+        if (qrConfig && qrConfig.code_value === options.qrCode) {
+            isLocationVerified = true;
+        } else {
+            return { success: false, message: 'Invalid or expired QR code' };
+        }
+    }
+
     // 4. Create Attendance Record
     const { error: insertError } = await supabase.from('staff_attendance').insert({
         staff_id: staffId,
         date: today,
         status: 'PRESENT', // Default
         check_in: new Date().toISOString(),
-        location_verified: !!locationData,
-        location_lat: locationData?.lat,
-        location_lng: locationData?.lng,
+        location_verified: isLocationVerified,
+        location_lat: options?.lat,
+        location_lng: options?.lng,
         pay_period_id: payPeriodId
     });
 
@@ -150,6 +168,55 @@ export async function clockOut(staffId: string, locationData?: { lat: number, ln
     revalidatePath('/dashboard');
     revalidatePath('/admin/staff-attendance');
     return { success: true, message: 'Clocked out successfully' };
+}
+
+/**
+ * Auto-closes any shifts from previous days that were left abandoned (no check_out).
+ * Sets the check_out to midnight of that same day (or checks out immediately with status='AUTO_CLOSED').
+ * For simplicity, we just mark check_out as check_in + 8 hours and status=LATE_CHECKOUT or something,
+ * but for this we'll just set check_out = check_in + 8h and save it to prevent blocking today.
+ */
+export async function autoCloseOpenShiftIfOld(userId: string) {
+    const supabase = await createClient();
+    
+    // 1. Find the staff record linked to this auth user
+    const { data: staff } = await supabase
+        .from('staff')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .single();
+        
+    if (!staff) return 0;
+    
+    const today = new Date().toISOString().split('T')[0];
+    
+    // 2. Find any open records strictly before today
+    const { data: oldShifts } = await supabase
+        .from('staff_attendance')
+        .select('id, check_in')
+        .eq('staff_id', staff.id)
+        .is('check_out', null)
+        .lt('date', today);
+        
+    if (!oldShifts || oldShifts.length === 0) return 0;
+    
+    // 3. Close them out (set check_out to 8h after check_in, logic can be tuned)
+    for (const shift of oldShifts) {
+        const checkInDate = new Date(shift.check_in);
+        const forceCheckOut = new Date(checkInDate.getTime() + 8 * 60 * 60 * 1000); // +8h
+        
+        await supabase
+            .from('staff_attendance')
+            .update({
+                check_out: forceCheckOut.toISOString(),
+                work_minutes: 8 * 60,
+                notes: 'AUTO-CLOSED: Forgot to clock out previous day.'
+            })
+            .eq('id', shift.id);
+    }
+    
+    return oldShifts.length;
 }
 
 /**

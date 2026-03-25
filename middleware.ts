@@ -53,20 +53,18 @@ export async function middleware(request: NextRequest) {
         }
 
         // Step 2: Role must exist in the database (never trust client-side state)
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role, roles')
-            .eq('id', user.id)
-            .single()
+        // profiles.role does NOT exist. Roles are in user_roles.
+        const { data: roleRows } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
 
-        if (!profile) {
+        if (!roleRows || roleRows.length === 0) {
             return NextResponse.redirect(new URL('/login', request.url))
         }
 
         // Step 3: Enforce role-based access — redirect to correct dashboard or login
-        const userRoles = profile.roles && profile.roles.length > 0
-            ? profile.roles
-            : [profile.role]
+        const userRoles = roleRows.map((r) => r.role as string)
 
         if (pathname.startsWith('/admin') && !userRoles.includes('ADMIN')) {
             if (userRoles.includes('TEACHER')) {
@@ -106,5 +104,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/admin/:path*', '/teacher/:path*', '/office/:path*'],
+    matcher: ['/admin/:path*', '/teacher/:path*', '/office/:path*', '/clock-in/:path*'],
 }
