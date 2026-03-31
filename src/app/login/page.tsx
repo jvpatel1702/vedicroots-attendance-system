@@ -34,13 +34,13 @@ export default function LoginPage() {
                 }
                 const role = ROLE_PRIORITY.find(r => roles.includes(r)) ?? roles[0];
 
-                // Check clock-in status before routing
-                const clockStatus = await getStaffClockInStatus(session.user.id);
+                // Check clock-in status before routing (Temporarily disabled for development)
+                // const clockStatus = await getStaffClockInStatus(session.user.id);
 
-                if (clockStatus.hasStaffRecord && !clockStatus.isClockedIn) {
-                    router.replace('/clock-in');
-                    return;
-                }
+                // if (clockStatus.hasStaffRecord && !clockStatus.isClockedIn) {
+                //     router.replace('/clock-in');
+                //     return;
+                // }
 
                 if (role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'ORG_ADMIN') {
                     router.replace('/admin');
@@ -94,13 +94,13 @@ export default function LoginPage() {
             
             const role = ROLE_PRIORITY.find(r => roles.includes(r)) ?? roles[0];
 
-            // Check clock-in status before routing
-            const clockStatus = await getStaffClockInStatus(data.user.id);
+            // Check clock-in status before routing (Temporarily disabled for development)
+            // const clockStatus = await getStaffClockInStatus(data.user.id);
 
-            if (clockStatus.hasStaffRecord && !clockStatus.isClockedIn) {
-                router.push('/clock-in');
-                return;
-            }
+            // if (clockStatus.hasStaffRecord && !clockStatus.isClockedIn) {
+            //     router.push('/clock-in');
+            //     return;
+            // }
 
             if (role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'ORG_ADMIN') {
                 router.push('/admin');
