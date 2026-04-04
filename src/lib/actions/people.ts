@@ -20,17 +20,18 @@ export async function getProfiles() {
 
 /**
  * Fetches all profiles with the 'TEACHER' role.
- * 
+ * Roles live in the `user_roles` junction table, not on `profiles` directly.
+ *
  * @returns A list of teacher profiles.
  */
 export async function getTeachers() {
     const supabase = await createClient()
+    // Join via user_roles since profiles has no role column
     const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'TEACHER') // Assuming role column exists and used like this
-        .order('name')
+        .from('user_roles')
+        .select('profiles!user_id(id, name, email)')
+        .eq('role', 'TEACHER')
 
     if (error) throw new Error(error.message)
-    return data
+    return (data ?? []).map((r: any) => r.profiles).filter(Boolean)
 }

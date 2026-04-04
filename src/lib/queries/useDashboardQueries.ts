@@ -39,6 +39,8 @@ export function useDashboardStats(orgId: string | undefined) {
             const { data: attendance } = await supabase
                 .from('attendance')
                 .select(`
+                    id,
+                    student_id,
                     status,
                     arrival_time,
                     students!inner(
@@ -59,7 +61,7 @@ export function useDashboardStats(orgId: string | undefined) {
             const absent = attendance?.filter((a: any) => a.status === 'ABSENT').length || 0;
             const late = attendance?.filter((a: any) => a.status === 'LATE').length || 0;
             const absentStudents = attendance?.filter((a: any) => a.status === 'ABSENT').map((a: any) => ({
-                id: Math.random().toString(),
+                id: a.student_id,
                 name: a.students ? `${a.students.first_name} ${a.students.last_name}` : 'Unknown',
             })) || [];
 
@@ -73,6 +75,8 @@ export function useDashboardStats(orgId: string | undefined) {
             const { data: staffAttendance } = await supabase
                 .from('staff_attendance')
                 .select(`
+                    id,
+                    staff_id,
                     status,
                     check_in,
                     staff!inner(
@@ -86,12 +90,12 @@ export function useDashboardStats(orgId: string | undefined) {
 
             const uniqueEmployees = new Map<string, any>();
             staffAttendance?.forEach((sa: any) => {
-                const name = sa.staff?.persons
-                    ? `${sa.staff.persons.first_name} ${sa.staff.persons.last_name}`
-                    : 'Unknown';
-                if (!uniqueEmployees.has(name)) {
-                    uniqueEmployees.set(name, {
-                        id: Math.random().toString(),
+                if (!uniqueEmployees.has(sa.staff_id)) {
+                    const name = sa.staff?.persons
+                        ? `${sa.staff.persons.first_name} ${sa.staff.persons.last_name}`
+                        : 'Unknown';
+                    uniqueEmployees.set(sa.staff_id, {
+                        id: sa.staff_id,
                         name,
                         role: sa.staff?.role || 'Staff',
                         checkInTime: sa.check_in,
@@ -103,8 +107,8 @@ export function useDashboardStats(orgId: string | undefined) {
             const { data: enrollmentData } = await supabase
                 .from('enrollments')
                 .select(`
-                    start_date, end_date,
-                    students(first_name, last_name),
+                    id, start_date, end_date,
+                    students(id, first_name, last_name),
                     classrooms!inner(locations!inner(organization_id))
                 `)
                 .eq('classrooms.locations.organization_id', orgId!)
@@ -118,12 +122,12 @@ export function useDashboardStats(orgId: string | undefined) {
                 const sDate = new Date(e.start_date + 'T00:00:00');
                 const endDate = e.end_date ? new Date(e.end_date + 'T00:00:00') : null;
                 if (sDate.getMonth() === currentMonth && sDate.getFullYear() === now.getFullYear()) {
-                    admissionList.push({ id: Math.random().toString(), name: `${e.students.first_name} ${e.students.last_name}`, date: e.start_date, type: 'JOINING' });
+                    admissionList.push({ id: `join-${e.id}`, name: `${e.students.first_name} ${e.students.last_name}`, date: e.start_date, type: 'JOINING' });
                 } else if (sDate.getMonth() === nextMonth) {
-                    admissionList.push({ id: Math.random().toString(), name: `${e.students.first_name} ${e.students.last_name}`, date: e.start_date, type: 'UPCOMING' });
+                    admissionList.push({ id: `upcoming-${e.id}`, name: `${e.students.first_name} ${e.students.last_name}`, date: e.start_date, type: 'UPCOMING' });
                 }
                 if (endDate && endDate.getMonth() === currentMonth && endDate.getFullYear() === now.getFullYear()) {
-                    admissionList.push({ id: Math.random().toString(), name: `${e.students.first_name} ${e.students.last_name}`, date: e.end_date, type: 'FINISHING' });
+                    admissionList.push({ id: `finish-${e.id}`, name: `${e.students.first_name} ${e.students.last_name}`, date: e.end_date, type: 'FINISHING' });
                 }
             });
 

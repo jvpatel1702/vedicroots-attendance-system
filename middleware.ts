@@ -45,6 +45,13 @@ export async function middleware(request: NextRequest) {
 
     const pathname = request.nextUrl.pathname
 
+    // Protect clock-in — any authenticated user may access it
+    if (pathname.startsWith('/clock-in')) {
+        if (!user) {
+            return NextResponse.redirect(new URL('/login', request.url))
+        }
+    }
+
     // Protect all role-specific routes
     if (pathname.startsWith('/admin') || pathname.startsWith('/teacher') || pathname.startsWith('/office')) {
         // Step 1: Session must exist
