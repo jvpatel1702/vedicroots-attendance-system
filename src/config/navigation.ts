@@ -52,6 +52,12 @@ export const navItems: NavItem[] = [
         roles: ['ADMIN', 'TEACHER', 'OFFICE']
     },
     {
+        title: 'Classrooms',
+        href: '/admin/classrooms',
+        icon: Users,
+        roles: ['ADMIN', 'OFFICE']
+    },
+    {
         title: 'Staff',
         href: '/admin/staff',
         icon: UserCheck,
