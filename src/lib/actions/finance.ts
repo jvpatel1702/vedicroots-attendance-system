@@ -61,7 +61,9 @@ export async function calculateTeacherPay(teacherId: string, startDate: string, 
     const teacherAbsentSessions = new Map<string, Set<string>>()
 
     attendanceData?.forEach(record => {
-        const enrollment = record.elective_enrollments as { offering_id: string }
+        // Supabase infers the joined relation as an array type; cast through unknown
+        // to the actual runtime shape (a single object for this many-to-one join).
+        const enrollment = record.elective_enrollments as unknown as { offering_id: string }
         const oid = enrollment.offering_id
 
         if (!sessions.has(oid)) sessions.set(oid, new Set())
