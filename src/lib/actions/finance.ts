@@ -61,10 +61,8 @@ export async function calculateTeacherPay(teacherId: string, startDate: string, 
     const teacherAbsentSessions = new Map<string, Set<string>>()
 
     attendanceData?.forEach(record => {
-        const offeringId = (record.elective_enrollments as any).offering_id // Flattened by Supabase? check structure
-        // Actually supabase returns nested object.
-        // @ts-ignore
-        const oid = record.elective_enrollments.offering_id
+        const enrollment = record.elective_enrollments as { offering_id: string }
+        const oid = enrollment.offering_id
 
         if (!sessions.has(oid)) sessions.set(oid, new Set())
         if (!teacherAbsentSessions.has(oid)) teacherAbsentSessions.set(oid, new Set())

@@ -3,14 +3,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
-// Helper to determine status based on time
-const determineStatus = (checkInTime: string, scheduledStartTime: string): string => {
-    // Basic logic for now - could be enhanced with schedule comparison
-    // If checkIn > scheduled + grace_period -> LATE
-    // For now, default to PRESENT
-    return 'PRESENT';
-};
-
 /**
  * Clocks in a staff member.
  * 
@@ -35,7 +27,7 @@ export async function clockIn(staffId: string, options?: { lat?: number, lng?: n
     const today = new Date().toISOString().split('T')[0];
     const { data: existing } = await supabase
         .from('staff_attendance')
-        .select('*')
+        .select('id')
         .eq('staff_id', staffId)
         .eq('date', today)
         .single();
@@ -44,28 +36,30 @@ export async function clockIn(staffId: string, options?: { lat?: number, lng?: n
         return { success: false, message: 'Already clocked in for today' };
     }
 
-    // 3. Get current or next open pay period
-    // Simple logic: Find open pay period covering today
-    const { data: payPeriod } = await supabase
-        .from('pay_periods')
-        .select('id')
-        .eq('organization_id', staff.organization_id) // Assuming staff has org_id via person or we query it
-        .eq('status', 'OPEN')
-        .lte('start_date', today)
-        .gte('end_date', today)
-        .single();
-
-    // Note: Staff table migration in 20260207000000_staff_management.sql doesn't seem to have organization_id directly on staff?
-    // It links to person, which has organization_id.
-    // Let's resolve organization_id from person.
-
-    let orgId = null;
+    // 3. Resolve organization_id from person (staff links to person, not directly to org)
+    let orgId: string | null = null;
     if (staff.person_id) {
-        const { data: person } = await supabase.from('persons').select('organization_id').eq('id', staff.person_id).single();
+        const { data: person } = await supabase
+            .from('persons')
+            .select('organization_id')
+            .eq('id', staff.person_id)
+            .single();
         if (person) orgId = person.organization_id;
     }
 
-    let payPeriodId = payPeriod?.id;
+    // 4. Get current open pay period covering today
+    let payPeriodId: string | undefined;
+    if (orgId) {
+        const { data: payPeriod } = await supabase
+            .from('pay_periods')
+            .select('id')
+            .eq('organization_id', orgId)
+            .eq('status', 'OPEN')
+            .lte('start_date', today)
+            .gte('end_date', today)
+            .single();
+        payPeriodId = payPeriod?.id;
+    }
 
     // If no pay period found, we might want to still allow clock in but warn or create one? 
     // For now, allow null pay_period_id if not found (or strict mode?)

@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { addWeeks, format, parse, isSameDay } from 'date-fns'
+import { addWeeks, format, parse } from 'date-fns'
 
 // --- Types ---
 
@@ -141,7 +141,6 @@ export async function generateClassSessions(offeringId: string) {
 
     // Advance to first occurrence
     while (current.getDay() !== targetDayIndex) {
-        current = addWeeks(current, 0) // no-op, just to keep type
         current.setDate(current.getDate() + 1)
     }
 
@@ -343,51 +342,58 @@ export async function markElectiveAttendance(payload: {
 }[]) {
     const supabase = await createClient()
 
-    // We need to map enrollment_id + date back to class_id + student_id
-    // But payload usually comes from the sheet which knows the class_id and student_id?
-    // Looking at ElectiveAttendanceSheet.tsx:
-    // payload = students.map(s => ({ enrollment_id: s.enrollment_id, date: date, status: s.status, is_rollover: s.is_rollover, rollover_note: s.rollover_note }))
-
-    // Let's resolve class_id first
     if (payload.length === 0) return
 
-    // All should be for the same date and same offering (implied by sheet)
-    // We need student_id and class_id
+    // All items share the same date (emitted from a single attendance sheet)
+    const date = payload[0].date
+    const enrollmentIds = payload.map(p => p.enrollment_id)
 
-    for (const item of payload) {
-        // Resolve student_id from enrollment_id
-        const { data: enrollment } = await supabase
-            .from('elective_enrollments')
-            .select('student_id, offering_id')
-            .eq('id', item.enrollment_id)
-            .single()
+    // Batch 1: resolve all enrollment -> (student_id, offering_id) in one query
+    const { data: enrollments, error: enrollmentError } = await supabase
+        .from('elective_enrollments')
+        .select('id, student_id, offering_id')
+        .in('id', enrollmentIds)
 
-        if (!enrollment) continue
+    if (enrollmentError) throw new Error(enrollmentError.message)
+    if (!enrollments || enrollments.length === 0) return
 
-        // Resolve class_id from offering_id + date
-        const { data: classSession } = await supabase
-            .from('elective_classes')
-            .select('id')
-            .eq('offering_id', enrollment.offering_id)
-            .eq('date', item.date)
-            .single()
+    // Batch 2: resolve all offering_id + date -> class_id in one query
+    const offeringIds = [...new Set(enrollments.map(e => e.offering_id))]
+    const { data: classSessions, error: classError } = await supabase
+        .from('elective_classes')
+        .select('id, offering_id')
+        .in('offering_id', offeringIds)
+        .eq('date', date)
 
-        if (!classSession) continue
+    if (classError) throw new Error(classError.message)
 
-        const upsertData = {
-            class_id: classSession.id,
+    // Build lookup maps
+    const enrollmentMap = new Map(enrollments.map(e => [e.id, e]))
+    const classMap = new Map(classSessions?.map(c => [c.offering_id, c.id]) ?? [])
+
+    // Compose the upsert rows
+    const upsertRows = payload.flatMap(item => {
+        const enrollment = enrollmentMap.get(item.enrollment_id)
+        if (!enrollment) return []
+        const classId = classMap.get(enrollment.offering_id)
+        if (!classId) return []
+        return [{
+            class_id: classId,
             student_id: enrollment.student_id,
             status: item.status,
             is_rollover: item.is_rollover,
-            rollover_note: item.rollover_note
-        }
+            rollover_note: item.rollover_note,
+        }]
+    })
 
-        const { error } = await supabase
-            .from('elective_attendance')
-            .upsert(upsertData, { onConflict: 'class_id, student_id' })
+    if (upsertRows.length === 0) return
 
-        if (error) throw new Error(error.message)
-    }
+    // Batch 3: upsert all records at once
+    const { error } = await supabase
+        .from('elective_attendance')
+        .upsert(upsertRows, { onConflict: 'class_id, student_id' })
+
+    if (error) throw new Error(error.message)
 
     revalidatePath('/teacher/electives')
 }

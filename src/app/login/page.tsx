@@ -4,7 +4,16 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 import { Loader2, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
-import { getStaffClockInStatus } from '@/lib/actions/staff-attendance';
+
+const ROLE_PRIORITY = ['ADMIN', 'SUPER_ADMIN', 'ORG_ADMIN', 'OFFICE', 'TEACHER', 'PARENT'];
+
+function dashboardForRoles(roles: string[]): string | null {
+    const role = ROLE_PRIORITY.find(r => roles.includes(r)) ?? roles[0];
+    if (role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'ORG_ADMIN') return '/admin';
+    if (role === 'TEACHER') return '/teacher';
+    if (role === 'OFFICE') return '/office';
+    return null;
+}
 
 export default function LoginPage() {
     const supabase = createClient();
@@ -26,28 +35,14 @@ export default function LoginPage() {
                     .select('role')
                     .eq('user_id', session.user.id);
 
-                const ROLE_PRIORITY = ['ADMIN', 'SUPER_ADMIN', 'ORG_ADMIN', 'OFFICE', 'TEACHER', 'PARENT'];
                 const roles = roleRows?.map((r: any) => r.role as string) ?? [];
                 if (roles.length === 0) {
                     setChecking(false);
                     return;
                 }
-                const role = ROLE_PRIORITY.find(r => roles.includes(r)) ?? roles[0];
-
-                // Check clock-in status before routing (Temporarily disabled for development)
-                // const clockStatus = await getStaffClockInStatus(session.user.id);
-
-                // if (clockStatus.hasStaffRecord && !clockStatus.isClockedIn) {
-                //     router.replace('/clock-in');
-                //     return;
-                // }
-
-                if (role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'ORG_ADMIN') {
-                    router.replace('/admin');
-                } else if (role === 'TEACHER') {
-                    router.replace('/teacher');
-                } else if (role === 'OFFICE') {
-                    router.replace('/office');
+                const destination = dashboardForRoles(roles);
+                if (destination) {
+                    router.replace(destination);
                 } else {
                     setChecking(false);
                 }
@@ -83,31 +78,17 @@ export default function LoginPage() {
                 console.error('Role fetch error:', roleError);
             }
 
-            const ROLE_PRIORITY = ['ADMIN', 'SUPER_ADMIN', 'ORG_ADMIN', 'OFFICE', 'TEACHER', 'PARENT'];
             const roles = roleRows?.map((r: any) => r.role as string) ?? [];
-            
+
             if (roles.length === 0) {
                 setError('Your account has no role assigned. Contact an administrator.');
                 setLoading(false);
                 return;
             }
-            
-            const role = ROLE_PRIORITY.find(r => roles.includes(r)) ?? roles[0];
 
-            // Check clock-in status before routing (Temporarily disabled for development)
-            // const clockStatus = await getStaffClockInStatus(data.user.id);
-
-            // if (clockStatus.hasStaffRecord && !clockStatus.isClockedIn) {
-            //     router.push('/clock-in');
-            //     return;
-            // }
-
-            if (role === 'ADMIN' || role === 'SUPER_ADMIN' || role === 'ORG_ADMIN') {
-                router.push('/admin');
-            } else if (role === 'TEACHER') {
-                router.push('/teacher');
-            } else if (role === 'OFFICE') {
-                router.push('/office');
+            const destination = dashboardForRoles(roles);
+            if (destination) {
+                router.push(destination);
             } else {
                 setError('Your account has no role assigned. Contact an administrator.');
                 setLoading(false);
